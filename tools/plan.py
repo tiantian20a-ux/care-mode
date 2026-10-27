@@ -13,7 +13,7 @@ import re
 import sys
 
 TIERS = {"recommended", "optional", "consent"}
-ACTION_TYPES = {"setting", "wm_density", "appop_revoke_all", "suspend", "notification_channels"}
+ACTION_TYPES = {"setting", "wm_density", "appop_revoke_all", "suspend", "notification_channels", "ui_recipe", "package_network_off"}
 SETTING_NS = {"system", "secure", "global"}
 PKG_RE = re.compile(r"^[A-Za-z][\w]*(\.[A-Za-z_][\w]*)+$")
 
