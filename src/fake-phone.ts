@@ -1,6 +1,7 @@
 // 模拟手机：解释规则引擎会发出的 adb shell 命令，用于自动测试和网页的演示模式。
 
 import type { Shell } from "./types";
+import { FakeUi, fakeXiaomiApps } from "./fake-ui";
 
 export interface FakeChannel {
   pkg: string;
@@ -23,6 +24,11 @@ export interface FakeState {
   privateDnsReachable: boolean;
   locked: boolean;
   user: number;
+  /** 电脑能不能点屏幕（小米没开「USB 调试（安全设置）」时不能）。 */
+  inputAllowed: boolean;
+  /** 系统有没有按应用禁止联网的命令。 */
+  pkgNetworking: boolean;
+  netOff: string[];
 }
 
 export function demoState(): FakeState {
@@ -43,7 +49,23 @@ export function demoState(): FakeState {
     },
     density: { physical: 440 },
     appops: { REQUEST_INSTALL_PACKAGES: { "com.tencent.mm": "allow", "com.android.browser": "allow", "com.ss.android.ugc.aweme": "allow" } },
-    packages: ["com.miui.hybrid", "com.tencent.mm", "com.android.browser", "com.ss.android.ugc.aweme", "com.taobao.taobao"],
+    packages: [
+      "com.miui.hybrid",
+      "com.tencent.mm",
+      "com.android.browser",
+      "com.ss.android.ugc.aweme",
+      "com.taobao.taobao",
+      "com.miui.systemAdSolution",
+      "com.xiaomi.market",
+      "com.miui.securitycenter",
+      "com.android.providers.downloads.ui",
+      "com.android.thememanager",
+      "com.android.quicksearchbox",
+      "com.miui.personalassistant",
+      "com.miui.weather2",
+      "com.android.calendar",
+      "com.android.settings",
+    ],
     suspended: [],
     channels: [
       { pkg: "com.taobao.taobao", id: "promo", name: "优惠活动", importance: 3 },
@@ -59,6 +81,9 @@ export function demoState(): FakeState {
     privateDnsReachable: true,
     locked: false,
     user: 0,
+    inputAllowed: true,
+    pkgNetworking: true,
+    netOff: [],
   };
 }
 
@@ -70,7 +95,11 @@ export class FakePhone implements Shell {
   disconnected = false;
   private page?: FakeChannel;
 
-  constructor(public s: FakeState, private delayMs = 0) {}
+  constructor(
+    public s: FakeState,
+    private delayMs = 0,
+    public ui: FakeUi = fakeXiaomiApps(),
+  ) {}
 
   async sleep(ms: number) {
     if (this.delayMs) await new Promise((r) => setTimeout(r, Math.min(ms, this.delayMs * 4)));
@@ -154,10 +183,45 @@ export class FakePhone implements Shell {
       }
       return ok(out);
     }
+    if (cmd === "input keyevent 0") return s.inputAllowed ? ok() : err("java.lang.SecurityException: Injecting to another application requires INJECT_EVENTS permission\n");
     if (cmd.startsWith("input keyevent")) {
-      if (cmd.endsWith("KEYCODE_HOME")) this.page = undefined;
+      if (cmd.endsWith("KEYCODE_HOME")) {
+        this.page = undefined;
+        this.ui.home();
+      }
+      if (cmd.endsWith("BACK")) {
+        if (this.page) this.page = undefined;
+        else this.ui.back();
+      }
       return ok();
     }
+    if (cmd === "wm size") return ok("Physical size: 1080x2400\n");
+    if (cmd === "dumpsys window | grep -m1 mCurrentFocus") {
+      const f = this.page ? "com.android.settings/.notification.ChannelNotificationSettings" : this.ui.focus();
+      return ok(`  mCurrentFocus=Window{1a2b3c u0 ${f}}\n`);
+    }
+    if (cmd === "dumpsys window | grep -m1 isKeyguardShowing") return ok(`    isKeyguardShowing=${s.locked}\n`);
+    if (cmd === "am start -f 0x10008000 -a android.settings.SETTINGS") {
+      this.ui.launch("com.android.settings");
+      return ok("Starting: Intent { act=android.settings.SETTINGS }\n");
+    }
+    if ((m = /^am start -f 0x10008000 -n ([\w.]+)\/(\S+)$/.exec(cmd))) {
+      if (!s.packages.includes(m[1]) || !this.ui.launch(m[1], m[2])) return err("Error: Activity class does not exist.\n");
+      return ok("Starting: Intent { cmp=" + m[1] + "/" + m[2] + " }\n");
+    }
+    if (/^am force-stop [\w.]+$/.test(cmd)) return ok();
+    if ((m = /^monkey -p ([\w.]+) -c android\.intent\.category\.LAUNCHER 1$/.exec(cmd))) {
+      if (!s.packages.includes(m[1]) || !this.ui.launch(m[1])) return err("** No activities found to run, monkey aborted.\n");
+      return ok("Events injected: 1\n");
+    }
+    if ((m = /^pm path ([\w.]+)$/.exec(cmd))) return s.packages.includes(m[1]) ? ok(`package:/system/app/${m[1]}/base.apk\n`) : err("", 1);
+    if (cmd === "cmd connectivity help") return ok(s.pkgNetworking ? "  set-package-networking-enabled [true|false] [package name]\n  set-chain3-enabled [true|false]\n" : "  airplane-mode [enable|disable]\n");
+    if ((m = /^cmd connectivity set-package-networking-enabled (true|false) ([\w.]+)$/.exec(cmd))) {
+      s.netOff = s.netOff.filter((p) => p !== m![2]);
+      if (m[1] === "false") s.netOff.push(m[2]);
+      return ok();
+    }
+    if (cmd === "cmd connectivity set-chain3-enabled true") return ok();
     if ((m = /^am start -a android\.settings\.CHANNEL_NOTIFICATION_SETTINGS --es android\.provider\.extra\.APP_PACKAGE ([\w.]+) --es android\.provider\.extra\.CHANNEL_ID (\S+)$/.exec(cmd))) {
       const id = unq(m[2]);
       this.page = s.channels.find((c) => c.pkg === m![1] && c.id === id);
@@ -165,7 +229,7 @@ export class FakePhone implements Shell {
     }
     if (cmd.startsWith("uiautomator dump")) {
       if (s.locked) return ok(`<?xml version='1.0'?><hierarchy rotation="0"><node package="com.android.systemui" checkable="false" checked="false" bounds="[0,0][1080,2400]" /></hierarchy>`);
-      if (!this.page) return ok(`<?xml version='1.0'?><hierarchy rotation="0"><node package="com.miui.home" checkable="false" checked="false" bounds="[0,0][1080,2400]" /></hierarchy>`);
+      if (!this.page) return ok(this.ui.dump());
       const on = this.page.importance > 0;
       return ok(
         `<?xml version='1.0'?><hierarchy rotation="0"><node package="com.android.settings" checkable="false" checked="false" bounds="[0,0][1080,2400]">` +
@@ -174,8 +238,18 @@ export class FakePhone implements Shell {
           `</node></hierarchy>`,
       );
     }
-    if ((m = /^input tap (\d+) (\d+)$/.exec(cmd))) {
+    if ((m = /^input swipe (\d+) (\d+) (\d+) (\d+) \d+$/.exec(cmd)) && (m[1] !== m[3] || m[2] !== m[4])) {
+      if (!s.inputAllowed) return err("INJECT_EVENTS permission denied\n");
+      this.ui.scroll(Number(m[2]) - Number(m[4]));
+      return ok();
+    }
+    if ((m = /^input (?:tap|swipe) (\d+) (\d+)(?: \1 \2 \d+)?$/.exec(cmd))) {
+      if (!s.inputAllowed) return err("INJECT_EVENTS permission denied\n");
       const y = Number(m[2]);
+      if (!this.page) {
+        this.ui.tap(Number(m[1]), y);
+        return ok();
+      }
       if (this.page && y >= 300 && y <= 450) {
         const c = this.page;
         if (c.importance > 0) {

@@ -1,7 +1,10 @@
 import "./style.css";
-import packJson from "../rules/common.json";
+import commonJson from "../rules/common.json";
+import xiaomiJson from "../rules/xiaomi.json";
 import type { Backup, Pack, Rule, Shell } from "./types";
 import {
+  brandPackFor,
+  mergePacks,
   defaultParams,
   execute,
   orderedRules,
@@ -18,7 +21,11 @@ import {
 } from "./engine";
 import { FakePhone, demoState } from "./fake-phone";
 
-const pack = packJson as unknown as Pack;
+const common = commonJson as unknown as Pack;
+const brandPacks = [xiaomiJson as unknown as Pack];
+/** 连上手机后换成「通用 + 这个品牌」合并后的规则包。 */
+let pack: Pack = common;
+let brand: Pack | undefined;
 const app = document.getElementById("app")!;
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -79,7 +86,7 @@ function lastBackup(): Backup | undefined {
 }
 
 async function getShell(onAuth: () => void): Promise<Shell | undefined> {
-  if (demo) return new FakePhone(demoState(), 120);
+  if (demo) return new FakePhone(demoState(), 30);
   const { connectUsb } = await import("./adb-usb");
   return connectUsb(onAuth);
 }
@@ -150,7 +157,10 @@ async function connect() {
       return;
     }
     status.textContent = "已连接，正在检查手机……";
-    review(await preflight(shell, pack));
+    const pf = await preflight(shell, common);
+    brand = brandPackFor(pf.device, brandPacks);
+    pack = mergePacks(common, brand);
+    review(pf);
   } catch (e) {
     status.innerHTML = `<span style="color:var(--bad)">连接失败：${esc((e as Error).message)}</span>`;
     btn.disabled = false;
@@ -160,7 +170,7 @@ async function connect() {
 // ---------- 选择要做的事 ----------
 
 function ruleRow(rule: Rule, pf: PreflightResult): string {
-  const skip = skipReason(rule, { sdk: pf.device.sdk, online: pf.online });
+  const skip = skipReason(rule, { sdk: pf.device.sdk, online: pf.online, inputAllowed: pf.inputAllowed });
   const checked = !skip && rule.tier === "recommended";
   const badge = rule.tier === "consent" ? `<span class="badge consent">需机主同意</span>` : rule.tier === "recommended" ? `<span class="badge">推荐</span>` : "";
   const params = Object.entries(rule.params ?? {})
@@ -196,7 +206,14 @@ function review(pf: PreflightResult) {
     </div>
     ${pf.problems.map((p) => `<div class="note ${p.level === "abort" ? "bad" : "warn"}">${esc(p.message)}</div>`).join("")}
     ${abort ? `<div class="btns"><button id="back">返回</button></div>` : `
-      <div class="card">${orderedRules(pack).map((r) => ruleRow(r, pf)).join("")}</div>
+      <h2>通用设置（所有安卓手机）</h2>
+      <div class="card">${orderedRules(pack).filter((r) => !r.group && !r.runLast).map((r) => ruleRow(r, pf)).join("")}</div>
+      ${brand ? `<h2>${esc(brand.title)}</h2>
+      ${brand.credits ? `<p class="muted">${esc(brand.credits)}</p>` : ""}
+      <div class="card">${orderedRules(pack).filter((r) => r.group).map((r) => ruleRow(r, pf)).join("")}</div>`
+        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO。</div>`}
+      <h2>收尾</h2>
+      <div class="card">${orderedRules(pack).filter((r) => r.runLast).map((r) => ruleRow(r, pf)).join("")}</div>
       <div class="note info">下一步会先读取手机当前的设置，生成备份文件下载到电脑。<b>请保存好这个文件</b>，以后还原要用。</div>
       <div class="btns"><button class="primary" id="go">备份并继续</button><button id="back">返回</button></div>
       <p id="status" class="muted"></p>`}
@@ -268,13 +285,14 @@ function confirmBackup(backup: Backup, plan: PlannedRule[]) {
   const saved = document.getElementById("saved") as HTMLInputElement;
   saved.addEventListener("change", () => ((document.getElementById("run") as HTMLButtonElement).disabled = !saved.checked));
   on("cancel", home);
-  on("run", () => run(plan));
+  on("run", () => run(plan, backup));
 }
 
 // ---------- 执行 ----------
 
-async function run(plan: PlannedRule[]) {
-  render(`<h1>正在设置，请不要拔线</h1><p class="muted" id="status">大约需要 1 到 3 分钟。</p><div class="card" id="logbox"></div>`);
+async function run(plan: PlannedRule[], backup: Backup) {
+  const uiCount = plan.filter((p) => p.rule.executor === "ui").length;
+  render(`<h1>正在设置，请不要拔线</h1><p class="muted" id="status">大约需要 ${uiCount > 2 ? "5 到 15" : "1 到 3"} 分钟。手机屏幕会自己动，这是工具在点设置，请不要碰它。</p><div class="card" id="logbox"></div>`);
   const { log, el } = logView();
   document.getElementById("logbox")!.appendChild(el);
   let result: Record<string, Outcome>;
@@ -286,19 +304,28 @@ async function run(plan: PlannedRule[]) {
     on("home", home);
     return;
   }
-  done(plan, result, el);
+  // 界面配方改了哪些应用内开关，执行后才知道，已经补进备份的还原清单里。
+  rememberBackup(backup);
+  done(plan, result, el, backup);
 }
 
-function done(plan: PlannedRule[], result: Record<string, Outcome>, logEl: HTMLElement) {
+function done(plan: PlannedRule[], result: Record<string, Outcome>, logEl: HTMLElement, backup: Backup) {
+  const manual = backup.rules.flatMap((r) => r.restore).filter((o) => o.op === "manual");
   const label: Record<Outcome, string> = { ok: "✓ 完成", partial: "! 部分完成", rolled_back: "↺ 已自动改回", failed: "✗ 没做成，已改回" };
   render(`
     <h1>设置完成</h1>
     <div class="card"><ul class="result-list">${plan.map((p) => `<li>${label[result[p.rule.id]]}　${esc(p.rule.title)}</li>`).join("")}</ul></div>
     ${result["developer-off"] ? `<div class="note info">开发者选项已关闭，现在可以拔掉数据线了。以后要还原，需要重新打开 USB 调试，再点首页的「从备份还原」。</div>` : ""}
+    ${manual.length ? `<div class="card">
+      <p><b>改了 ${manual.length} 个应用里的开关。</b>这些没法自动还原，备份文件里已经记下了手动还原的方法。请<b>再下载一次备份</b>，替换掉刚才那份。</p>
+      <div class="btns" style="margin-top:8px"><button class="primary" id="dl-full">下载完整备份</button></div>
+      <details><summary>查看改了哪些开关，以及以后怎么手动还原</summary><ul>${manual.map((o) => `<li>${esc(o.op === "manual" ? o.text : "")}</li>`).join("")}</ul></details>
+    </div>` : ""}
     <details class="card"><summary>查看详细记录</summary><div id="logbox"></div></details>
     <div class="btns"><button id="home">回到首页</button></div>
   `);
   document.getElementById("logbox")!.appendChild(logEl);
+  on("dl-full", () => download(backup));
   on("home", home);
 }
 

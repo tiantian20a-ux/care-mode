@@ -3,6 +3,8 @@
 
 import type { Action, Backup, DeviceInfo, Pack, RestoreOp, Rule, Shell } from "./types";
 import { listChannels, setChannelEnabled, type Channel } from "./channels";
+import { Ui, UiError } from "./ui";
+import { RECIPES } from "./recipes";
 import { shQuote } from "./util";
 
 export { shQuote };
@@ -25,7 +27,7 @@ function fill(text: string, values: Record<string, string>): string {
 // ---------- 检查 ----------
 
 export async function readDevice(sh: Shell, pack: Pack): Promise<DeviceInfo> {
-  const get = async (k: string) => (await sh.run(`getprop ${pack.preflight.props[k]}`)).out.trim();
+  const get = async (k: string) => (await sh.run(`getprop ${pack.preflight!.props[k]}`)).out.trim();
   return {
     brand: await get("brand"),
     manufacturer: await get("manufacturer"),
@@ -45,6 +47,8 @@ export async function dnsResolves(sh: Shell, host: string): Promise<boolean> {
 export interface PreflightResult {
   device: DeviceInfo;
   online: boolean;
+  /** 电脑能不能点手机屏幕。小米没开「USB 调试（安全设置）」时不行。 */
+  inputAllowed: boolean;
   problems: { level: "abort" | "warn"; message: string }[];
 }
 
@@ -55,14 +59,21 @@ export async function preflight(sh: Shell, pack: Pack): Promise<PreflightResult>
   if (!(device.sdk >= pack.appliesTo.minSdk)) {
     problems.push({ level: "abort", message: `这台手机的安卓版本太旧（需要安卓 8 以上）。` });
   }
-  for (const c of pack.preflight.checks) {
+  for (const c of pack.preflight!.checks) {
     let ok: boolean;
     if ("check" in c) ok = await dnsResolves(sh, c.host);
     else ok = (await sh.run(c.cmd)).out.trim() === c.expect;
     if (c.id === "network") online = ok;
     if (!ok) problems.push({ level: c.onFail, message: c.message });
   }
-  return { device, online, problems };
+  const inputAllowed = !/INJECT_EVENTS/.test((await sh.run("input keyevent 0")).out);
+  if (!inputAllowed) {
+    problems.push({
+      level: "warn",
+      message: "电脑现在点不动手机屏幕，需要点屏幕的项目会被跳过。小米/红米请在「开发者选项」里打开「USB 调试（安全设置）」（要插 SIM 卡并登录小米账号），然后重新连接。",
+    });
+  }
+  return { device, online, inputAllowed, problems };
 }
 
 // ---------- 参数和跳过条件 ----------
@@ -76,10 +87,25 @@ export function defaultParams(rule: Rule): Record<string, string> {
   return Object.fromEntries(Object.entries(rule.params ?? {}).map(([k, p]) => [k, p.default]));
 }
 
-export function skipReason(rule: Rule, ctx: { sdk: number; online: boolean }): string | null {
+export function skipReason(rule: Rule, ctx: { sdk: number; online: boolean; inputAllowed?: boolean }): string | null {
   if (rule.minSdk && ctx.sdk < rule.minSdk) return "这台手机的安卓版本不支持";
+  if (rule.executor === "ui" && ctx.inputAllowed === false) return "电脑点不动手机屏幕";
   if (rule.requires?.includes("preflight.network") && !ctx.online) return "手机现在没联网";
   return null;
+}
+
+export function brandPackFor(device: DeviceInfo, packs: Pack[]): Pack | undefined {
+  const eq = (list: string[] | undefined, v: string) => !!list?.some((x) => x.toLowerCase() === v.toLowerCase());
+  return packs.find((p) => p.match && (eq(p.match.brand, device.brand) || eq(p.match.manufacturer, device.manufacturer)));
+}
+
+/** 通用规则在前，品牌规则在中间，收尾（runLast）规则永远最后。 */
+export function mergePacks(common: Pack, brand?: Pack): Pack {
+  if (!brand) return common;
+  return {
+    ...common,
+    rules: [...common.rules.filter((r) => !r.runLast), ...brand.rules.map((r) => ({ ...r, group: r.group ?? brand.title })), ...common.rules.filter((r) => r.runLast)],
+  };
 }
 
 export function orderedRules(pack: Pack): Rule[] {
@@ -90,7 +116,8 @@ export function orderedRules(pack: Pack): Rule[] {
 
 type Step =
   | { kind: "cmd"; cmd: string; tolerateDisconnect?: boolean }
-  | { kind: "channel_off"; ch: Channel };
+  | { kind: "channel_off"; ch: Channel }
+  | { kind: "ui"; recipe: string; segment: string; title: string };
 
 export interface PlannedRule {
   rule: Rule;
@@ -149,6 +176,23 @@ async function planAction(sh: Shell, a: Action, values: Record<string, string>):
         restore: todo.map((p) => ({ op: "unsuspend", pkg: p })),
       };
     }
+    case "ui_recipe": {
+      if (!RECIPES[a.recipe]?.[a.segment]) throw new Error(`找不到配方 ${a.recipe}/${a.segment}`);
+      // 改了哪些开关要执行后才知道，到时候再补进还原清单。
+      return { steps: [{ kind: "ui", recipe: a.recipe, segment: a.segment, title: a.segment }], restore: [] };
+    }
+    case "package_network_off": {
+      const installed = (await sh.run(`pm list packages ${a.pkg}`)).out.split("\n").some((l) => l.trim() === `package:${a.pkg}`);
+      const supported = /set-package-networking-enabled/.test((await sh.run("cmd connectivity help")).out);
+      if (!installed || !supported) return { steps: [], restore: [] };
+      return {
+        steps: [
+          { kind: "cmd", cmd: `cmd connectivity set-package-networking-enabled false ${a.pkg}` },
+          { kind: "cmd", cmd: "cmd connectivity set-chain3-enabled true" },
+        ],
+        restore: [{ op: "package_network", pkg: a.pkg, enabled: true }],
+      };
+    }
     case "notification_channels": {
       const all = await listChannels(sh, a.listCmd);
       const hit = all.filter(
@@ -203,11 +247,37 @@ export type Outcome = "ok" | "partial" | "rolled_back" | "failed";
 
 export async function execute(sh: Shell, plan: PlannedRule[], log: Log): Promise<Record<string, Outcome>> {
   const result: Record<string, Outcome> = {};
+  let ui: Ui | undefined;
   for (const p of plan) {
     log("info", `正在执行：${p.rule.title}`);
     let failures = 0;
     try {
       for (const s of p.steps) {
+        if (s.kind === "ui") {
+          if (!ui) {
+            ui = new Ui(sh, (t) => log("info", t));
+            await ui.init();
+          }
+          if (await ui.locked()) {
+            failures++;
+            log("warn", "手机锁屏了，这一项跳过。请解锁手机并保持亮屏。");
+            continue;
+          }
+          const before = ui.changed.length;
+          try {
+            await RECIPES[s.recipe][s.segment](ui);
+          } catch (e) {
+            if (!(e instanceof UiError) && !(e instanceof Error)) throw e;
+            failures++;
+            log("warn", (e as Error).message);
+          } finally {
+            await sh.run("input keyevent KEYCODE_HOME");
+          }
+          for (const c of ui.changed.slice(before)) {
+            p.restore.push({ op: "manual", text: `${c.page ? c.page + "：" : ""}把「${c.title}」${c.to ? "关掉" : "重新打开"}` });
+          }
+          continue;
+        }
         if (s.kind === "cmd") {
           try {
             const r = await sh.run(s.cmd, { timeoutMs: s.tolerateDisconnect ? 4000 : 15000 });
@@ -279,6 +349,12 @@ export function validateBackup(data: unknown): Backup {
         case "channel_on":
           if (!PKG_RE.test(op.pkg) || typeof op.channel !== "string") throw bad();
           break;
+        case "package_network":
+          if (!PKG_RE.test(op.pkg) || op.enabled !== true) throw bad();
+          break;
+        case "manual":
+          if (typeof op.text !== "string" || op.text.length > 300) throw bad();
+          break;
         default:
           throw bad();
       }
@@ -287,7 +363,7 @@ export function validateBackup(data: unknown): Backup {
   return b;
 }
 
-function restoreCmd(op: Exclude<RestoreOp, { op: "channel_on" }>): string {
+function restoreCmd(op: Exclude<RestoreOp, { op: "channel_on" | "manual" }>): string {
   switch (op.op) {
     case "setting":
       return op.value === null ? `settings delete ${op.ns} ${op.key}` : `settings put ${op.ns} ${op.key} ${shQuote(op.value)}`;
@@ -297,12 +373,18 @@ function restoreCmd(op: Exclude<RestoreOp, { op: "channel_on" }>): string {
       return `cmd appops set --user 0 ${op.pkg} ${op.name} ${op.mode}`;
     case "unsuspend":
       return `pm unsuspend --user 0 ${op.pkg}`;
+    case "package_network":
+      return `cmd connectivity set-package-networking-enabled true ${op.pkg}`;
   }
 }
 
 export async function runRestore(sh: Shell, ops: RestoreOp[], log: Log): Promise<number> {
   let failures = 0;
   for (const op of ops) {
+    if (op.op === "manual") {
+      log("warn", `需要手动还原：${op.text}`);
+      continue;
+    }
     if (op.op === "channel_on") {
       const ok = await setChannelEnabled(sh, { pkg: op.pkg, id: op.channel, name: op.name, importance: 0 }, true);
       if (!ok) {

@@ -14,6 +14,8 @@ export type Action =
   | { type: "wm_density"; factor: string }
   | { type: "appop_revoke_all"; op: string; from: string; to: string }
   | { type: "suspend"; onlyIfInstalled?: boolean; packages: { pkg: string; brand: string; verified: boolean }[] }
+  | { type: "ui_recipe"; recipe: string; segment: string }
+  | { type: "package_network_off"; pkg: string }
   | {
       type: "notification_channels";
       listCmd: string;
@@ -29,6 +31,8 @@ export interface DnsCheck {
 
 export interface Rule {
   id: string;
+  /** 界面上的分组标题，品牌规则包会设成品牌名。 */
+  group?: string;
   title: string;
   why: string;
   tier: Tier;
@@ -44,10 +48,13 @@ export interface Rule {
 
 export interface Pack {
   pack: string;
+  /** 品牌规则包：getprop 的 brand 或 manufacturer 命中任一（不分大小写）就用。 */
+  match?: { brand?: string[]; manufacturer?: string[] };
+  credits?: string;
   title: string;
   version: string;
   appliesTo: { os: string; minSdk: number };
-  preflight: {
+  preflight?: {
     props: Record<string, string>;
     checks: (
       | { id: string; cmd: string; expect: string; onFail: "abort" | "warn"; message: string }
@@ -71,7 +78,10 @@ export type RestoreOp =
   | { op: "density"; value: number | null }
   | { op: "appop"; pkg: string; name: string; mode: string }
   | { op: "unsuspend"; pkg: string }
-  | { op: "channel_on"; pkg: string; channel: string; name: string };
+  | { op: "channel_on"; pkg: string; channel: string; name: string }
+  | { op: "package_network"; pkg: string; enabled: true }
+  /** 应用内的开关没法安全地自动拨回，只给出手动还原的提示。 */
+  | { op: "manual"; text: string };
 
 export interface Backup {
   format: "care-mode-backup";

@@ -95,7 +95,7 @@ describe("通用规则包", () => {
     const phone = new FakePhone(st);
     const { result } = await runAll(phone, [{ id: "marketing-channels", params: {} }]);
     expect(result["marketing-channels"]).toBe("partial");
-    expect(phone.log.some((c) => c.startsWith("input tap"))).toBe(false);
+    expect(phone.log.some((c) => c.startsWith("input tap") || c.startsWith("input swipe"))).toBe(false);
     expect(phone.s.channels.every((c) => c.importance > 0)).toBe(true);
   });
 

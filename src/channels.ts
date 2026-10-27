@@ -77,7 +77,10 @@ function mainSwitch(nodes: UiNode[]): UiNode | undefined {
 }
 
 async function tap(sh: Shell, n: UiNode) {
-  await sh.run(`input tap ${Math.round((n.x1 + n.x2) / 2)} ${Math.round((n.y1 + n.y2) / 2)}`);
+  const x = Math.round((n.x1 + n.x2) / 2);
+  const y = Math.round((n.y1 + n.y2) / 2);
+  // 有的系统吞 input tap，用 80 毫秒的短按代替。
+  await sh.run(`input swipe ${x} ${y} ${x} ${y} 80`);
 }
 
 async function currentImportance(sh: Shell, ch: Pick<Channel, "pkg" | "id">): Promise<number | undefined> {

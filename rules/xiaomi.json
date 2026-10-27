@@ -1,0 +1,181 @@
+{
+  "pack": "xiaomi",
+  "title": "小米 / 红米 / POCO 专属",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "Xiaomi",
+      "Redmi",
+      "POCO"
+    ],
+    "manufacturer": [
+      "Xiaomi"
+    ]
+  },
+  "credits": "设置路径来自 android-ad-cleaner（MIT）在 Xiaomi 18 Pro Max（HyperOS OS4.0.24）和 Xiaomi 18 Fold 上的实测。老款 MIUI 机型的入口可能不同，找不到会自动跳过。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "xiaomi-msa",
+      "title": "暂停系统广告组件（msa）",
+      "why": "com.miui.systemAdSolution 负责天气、日历、商店等系统应用的开屏广告和内置广告。暂停并禁止它联网后，这些广告基本消失。",
+      "tier": "consent",
+      "caution": "只暂停、不卸载，可以一键恢复。部分老系统不支持禁止联网，那时只暂停，广告可能仍会出现。断网规则在手机重启后可能失效。",
+      "actions": [
+        {
+          "type": "suspend",
+          "onlyIfInstalled": true,
+          "packages": [
+            {
+              "pkg": "com.miui.systemAdSolution",
+              "brand": "小米/红米/POCO",
+              "verified": true
+            }
+          ]
+        },
+        {
+          "type": "package_network_off",
+          "pkg": "com.miui.systemAdSolution"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-ads",
+      "title": "系统：关闭个性化广告推荐",
+      "why": "设置 → 隐私与安全 → 广告服务。系统会根据你的使用习惯推广告。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "系统广告"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-market",
+      "title": "应用商店：关个性化推荐和新手推送",
+      "why": "商店首页和通知里推荐的 App，很多是付费推广。更新通知保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "应用商店"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-security",
+      "title": "手机管家：关推荐内容",
+      "why": "清理垃圾后弹出的推荐资讯和 App。新版管家没有这两项会自动跳过。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "手机管家"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-downloads",
+      "title": "下载管理：关资源推荐和热榜",
+      "why": "下载列表里的推荐资源和热榜。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "下载管理"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-themes",
+      "title": "主题：关联网通知和个性化推荐",
+      "why": "主题商店的推广通知。自动更新保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "主题"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-browser",
+      "title": "浏览器：关个性化推荐和推送",
+      "why": "浏览器首页的资讯、宫格推送和「猜你想搜」。主页样式不改。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "浏览器"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-search",
+      "title": "桌面搜索：关热搜和推荐应用",
+      "why": "桌面下滑搜索页里的热搜榜、搜索提示词和推荐未安装应用。常用应用保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "全局搜索"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-assistant",
+      "title": "负一屏：关推荐卡片和热门活动",
+      "why": "桌面最左边那一屏的推广卡片。搜索框、出行助手保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "负一屏"
+        }
+      ]
+    },
+    {
+      "id": "xiaomi-ui-weather-calendar",
+      "title": "天气和日历：关内容推广",
+      "why": "天气、日历里的推广内容和视频卡片。天气预警保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "xiaomi",
+          "segment": "天气和日历"
+        }
+      ]
+    }
+  ]
+}

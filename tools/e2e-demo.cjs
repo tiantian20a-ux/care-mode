@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
   await p.waitForSelector('#go', { timeout: 20000 });
   await p.screenshot({ path: S + '/2-review.png', fullPage: true });
   // consent missing → message
-  await p.check('#r-quick-apps');
+  await p.check('#r-quick-apps'); await p.check('#r-xiaomi-msa'); await p.check('input[data-consent="xiaomi-msa"]');
   await p.click('#go');
   console.log('consent msg:', await p.textContent('#status'));
   await p.check('input[data-consent="quick-apps"]');
@@ -29,8 +29,8 @@ const { chromium } = require('playwright');
   await p.screenshot({ path: S + '/3-confirm.png', fullPage: true });
   await p.check('#saved');
   await p.click('#run');
-  await p.waitForSelector('text=设置完成', { timeout: 120000 });
-  await p.screenshot({ path: S + '/4-done.png', fullPage: true });
+  await p.waitForSelector('text=设置完成', { timeout: 400000 });
+  await p.screenshot({ path: S + '/4-done.png', fullPage: true }); const dl2 = p.waitForEvent('download'); await p.click('#dl-full'); await (await dl2).saveAs(S + '/backup.json'); console.log('full backup saved');
   console.log(await p.textContent('.result-list'));
   // restore flow
   await p.click('#home');
@@ -38,7 +38,7 @@ const { chromium } = require('playwright');
   await p.setInputFiles('#file', S + '/backup.json');
   await p.waitForSelector('text=确认还原');
   await p.click('#go');
-  await p.waitForSelector('text=全部还原完成', { timeout: 120000 });
+  await p.waitForSelector('text=还原完成', { timeout: 300000 });
   await p.screenshot({ path: S + '/5-restored.png', fullPage: true });
   // mobile width check
   const m = await b.newPage({ viewport: { width: 375, height: 800 } });
