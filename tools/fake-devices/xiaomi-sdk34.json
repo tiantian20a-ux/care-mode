@@ -1,0 +1,9 @@
+{
+  "brand": "Xiaomi", "model": "Redmi Note 13", "sdk": 34, "online": true,
+  "settings": { "system/font_scale": "1.0", "secure/long_press_timeout": "400", "global/private_dns_mode": "opportunistic", "global/development_settings_enabled": "1", "global/adb_enabled": "1" },
+  "density": { "physical": 440 },
+  "appops": { "REQUEST_INSTALL_PACKAGES": ["com.tencent.mm", "com.android.browser"] },
+  "packages": ["com.miui.hybrid", "com.tencent.mm"],
+  "suspended": [],
+  "optIn": ["quick-apps", "display-size"]
+}

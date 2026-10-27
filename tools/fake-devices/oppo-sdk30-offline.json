@@ -1,0 +1,9 @@
+{
+  "brand": "OPPO", "model": "A93", "sdk": 30, "online": false,
+  "settings": { "system/font_scale": "1.15" },
+  "density": { "physical": 480, "override": 460 },
+  "appops": {},
+  "packages": ["com.nearme.instant.platform"],
+  "suspended": ["com.nearme.instant.platform"],
+  "optIn": ["quick-apps"]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "care-mode",
+  "version": "1.0.0",
+  "description": "老年机关怀模式：在 Chrome/Edge 里通过 USB 一键给安卓手机去广告、调大字体",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p . && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "rules": "python3 tools/plan.py rules/common.json --check"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@yume-chan/adb": "2.6.4",
+    "@yume-chan/adb-credential-web": "2.1.0",
+    "@yume-chan/adb-daemon-webusb": "2.3.2"
+  },
+  "devDependencies": {
+    "@types/w3c-web-usb": "1.0.10",
+    "typescript": "5.8.3",
+    "vite": "6.3.5",
+    "vitest": "3.1.4"
+  },
+  "private": true,
+  "type": "module"
+}

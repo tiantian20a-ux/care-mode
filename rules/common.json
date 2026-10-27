@@ -1,0 +1,298 @@
+{
+  "pack": "common",
+  "title": "通用安卓关怀规则包",
+  "version": "0.1.0",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "notes": [
+    "只使用系统自带的设置和 adb shell 命令，不卸载、不停用系统应用，不需要 root。",
+    "每条规则执行前都会先备份原值，还原时按备份写回。",
+    "规则顺序就是执行顺序；runLast 的规则永远放最后。"
+  ],
+  "tiers": {
+    "recommended": "默认勾选，影响小，可完全还原",
+    "optional": "默认不勾选，可能影响部分机型的界面",
+    "consent": "默认不勾选，执行前必须由机主再确认一次"
+  },
+  "preflight": {
+    "description": "只读检查，不改任何东西",
+    "props": {
+      "brand": "ro.product.brand",
+      "manufacturer": "ro.product.manufacturer",
+      "model": "ro.product.model",
+      "sdk": "ro.build.version.sdk",
+      "release": "ro.build.version.release"
+    },
+    "checks": [
+      {
+        "id": "user0",
+        "cmd": "am get-current-user",
+        "expect": "0",
+        "onFail": "abort",
+        "message": "当前不是机主账户（可能在应用分身或访客模式），请切回机主后再试。"
+      },
+      {
+        "id": "network",
+        "check": "dns_resolves",
+        "host": "www.baidu.com",
+        "onFail": "warn",
+        "message": "手机现在上不了网，DNS 规则会被跳过。"
+      }
+    ]
+  },
+  "rules": [
+    {
+      "id": "font-scale",
+      "title": "调大字体",
+      "why": "老人看不清小字。",
+      "tier": "recommended",
+      "params": {
+        "scale": {
+          "default": "1.3",
+          "choices": [
+            "1.15",
+            "1.3"
+          ],
+          "choicesMinSdk34": [
+            "1.15",
+            "1.3",
+            "1.5",
+            "1.8"
+          ]
+        }
+      },
+      "actions": [
+        {
+          "type": "setting",
+          "ns": "system",
+          "key": "font_scale",
+          "value": "{{scale}}"
+        }
+      ]
+    },
+    {
+      "id": "display-size",
+      "title": "调大显示（图标和按钮一起变大）",
+      "why": "只调字体时按钮还是小，容易点错。",
+      "tier": "optional",
+      "caution": "少数桌面放大后图标会挤到下一页，执行后请看一眼桌面。",
+      "params": {
+        "factor": {
+          "default": "1.15",
+          "choices": [
+            "1.1",
+            "1.15",
+            "1.25"
+          ]
+        }
+      },
+      "actions": [
+        {
+          "type": "wm_density",
+          "factor": "{{factor}}"
+        }
+      ]
+    },
+    {
+      "id": "long-press-delay",
+      "title": "长按要按久一点才生效",
+      "why": "老人手指停留久，容易误触发长按，把桌面图标拖乱或删掉。",
+      "tier": "recommended",
+      "actions": [
+        {
+          "type": "setting",
+          "ns": "secure",
+          "key": "long_press_timeout",
+          "value": "1000"
+        }
+      ]
+    },
+    {
+      "id": "screen-timeout",
+      "title": "屏幕 5 分钟后再熄灭",
+      "why": "老人看东西慢，屏幕太快黑掉会以为手机坏了。",
+      "tier": "optional",
+      "actions": [
+        {
+          "type": "setting",
+          "ns": "system",
+          "key": "screen_off_timeout",
+          "value": "300000"
+        }
+      ]
+    },
+    {
+      "id": "private-dns",
+      "title": "私人 DNS 拦截广告",
+      "why": "在网络层拦掉大部分广告和恶意网站，对所有 App 都有效。",
+      "tier": "recommended",
+      "requires": [
+        "preflight.network"
+      ],
+      "params": {
+        "host": {
+          "default": "dns.adguard-dns.com",
+          "choices": [
+            "dns.adguard-dns.com",
+            "family.adguard-dns.com"
+          ],
+          "labels": {
+            "dns.adguard-dns.com": "AdGuard 标准（拦广告和跟踪）",
+            "family.adguard-dns.com": "AdGuard 家庭（再加拦成人和赌博网站）"
+          }
+        }
+      },
+      "actions": [
+        {
+          "type": "setting",
+          "ns": "global",
+          "key": "private_dns_specifier",
+          "value": "{{host}}"
+        },
+        {
+          "type": "setting",
+          "ns": "global",
+          "key": "private_dns_mode",
+          "value": "hostname"
+        }
+      ],
+      "verify": {
+        "waitSeconds": 15,
+        "check": "dns_resolves",
+        "host": "www.baidu.com",
+        "retries": 2,
+        "onFail": "rollback",
+        "message": "这台手机连不上 AdGuard DNS，已自动改回原来的设置，避免手机断网。"
+      },
+      "minSdk": 28
+    },
+    {
+      "id": "block-unknown-sources",
+      "title": "关闭所有 App 的「安装未知应用」权限",
+      "why": "防止老人点了广告或短信链接后装上来路不明的 App。系统应用商店不受影响。",
+      "tier": "recommended",
+      "actions": [
+        {
+          "type": "appop_revoke_all",
+          "op": "REQUEST_INSTALL_PACKAGES",
+          "from": "allow",
+          "to": "deny"
+        }
+      ],
+      "minSdk": 29
+    },
+    {
+      "id": "quick-apps",
+      "title": "暂停快应用",
+      "why": "快应用不用安装就能从广告里直接弹出来，是很多弹窗和诱导页面的来源。",
+      "tier": "consent",
+      "caution": "暂停后快应用里的小游戏、小程序打不开，可以一键恢复。",
+      "actions": [
+        {
+          "type": "suspend",
+          "onlyIfInstalled": true,
+          "packages": [
+            {
+              "pkg": "com.miui.hybrid",
+              "brand": "小米/红米",
+              "verified": true
+            },
+            {
+              "pkg": "com.nearme.instant.platform",
+              "brand": "OPPO/一加/realme",
+              "verified": true
+            },
+            {
+              "pkg": "com.vivo.hybrid",
+              "brand": "vivo/iQOO",
+              "verified": true
+            },
+            {
+              "pkg": "com.huawei.fastapp",
+              "brand": "华为",
+              "verified": true
+            },
+            {
+              "pkg": "com.hihonor.fastapp",
+              "brand": "荣耀",
+              "verified": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "marketing-channels",
+      "title": "关闭营销类通知",
+      "why": "很多 App 用「推荐」「活动」通知推广告，但不能一刀切关掉所有通知。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "需要手机保持解锁、亮屏。只关名字命中关键词的通知类别，不关整个 App 的通知；关不掉的会自动跳过。",
+      "actions": [
+        {
+          "type": "notification_channels",
+          "listCmd": "dumpsys notification --noredact",
+          "matchName": [
+            "推荐",
+            "推广",
+            "活动",
+            "优惠",
+            "营销",
+            "热点",
+            "热搜",
+            "资讯",
+            "福利",
+            "红包",
+            "促销"
+          ],
+          "neverMatch": [
+            "验证码",
+            "安全",
+            "来电",
+            "短信",
+            "闹钟",
+            "天气",
+            "预警",
+            "快递",
+            "物流",
+            "支付",
+            "账户",
+            "系统更新"
+          ],
+          "skipPackages": [
+            "com.android.phone",
+            "com.android.mms",
+            "com.android.deskclock",
+            "com.tencent.mm"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "developer-off",
+      "title": "收尾：关闭开发者选项",
+      "why": "开发者选项开着，别人连上电脑就能改手机，也容易被骗子利用。",
+      "tier": "recommended",
+      "runLast": true,
+      "caution": "执行后电脑和手机会断开，所以备份文件必须先下载到电脑上。之后要还原，需要重新打开 USB 调试。",
+      "actions": [
+        {
+          "type": "setting",
+          "ns": "global",
+          "key": "development_settings_enabled",
+          "value": "0",
+          "noRestore": true
+        },
+        {
+          "type": "setting",
+          "ns": "global",
+          "key": "adb_enabled",
+          "value": "0",
+          "noRestore": true
+        }
+      ]
+    }
+  ]
+}
