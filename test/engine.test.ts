@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import pack from "../rules/common.json";
 import type { Pack } from "../src/types";
 import { FakePhone, demoState } from "../src/fake-phone";
-import { execute, preflight, prepare, restoreBackup, validateBackup, type Log } from "../src/engine";
+import { execute, mergeEarlierBackup, preflight, prepare, restoreBackup, validateBackup, type Log } from "../src/engine";
 import { parseChannels } from "../src/channels";
 
 const P = pack as unknown as Pack;
@@ -138,5 +138,55 @@ describe("解析 dumpsys notification", () => {
       { pkg: "com.example.app", id: "a.b", name: "活动, 优惠 (限时)", importance: 3 },
       { pkg: "com.other", id: "c", name: "推荐", importance: 0 },
     ]);
+  });
+});
+
+/** 收尾关掉了 USB 调试；模拟家人下次重新打开它再连上。 */
+function reconnect(phone: FakePhone) {
+  phone.disconnected = false;
+  phone.s.settings["global/adb_enabled"] = "1";
+  phone.s.settings["global/development_settings_enabled"] = "1";
+}
+
+describe("同一台手机再次设置", () => {
+  it("合并第一次的备份后，还原回到第一次设置之前", async () => {
+    const phone = new FakePhone(demoState());
+    const original = JSON.parse(JSON.stringify(phone.s));
+    const first = await runAll(phone);
+    reconnect(phone);
+    // 两次之间装了个新应用，它默认允许安装未知应用
+    phone.s.appops.REQUEST_INSTALL_PACKAGES["com.example.newapp"] = "allow";
+    phone.s.packages.push("com.example.newapp");
+    const sel = everything.map((x) => (x.id === "font-scale" ? { id: x.id, params: { scale: "1.5" } } : x));
+    const pf = await preflight(phone, P);
+    const { backup, plan } = await prepare(phone, P, pf.device, sel, quiet);
+    expect(backup.deviceId).toBe(first.backup.deviceId);
+    expect(backup.deviceId).toMatch(/^[0-9a-f]{16}$/);
+    expect(mergeEarlierBackup(backup, first.backup)).toBeGreaterThan(0);
+    expect(backup.mergedFrom).toBe(first.backup.createdAt);
+    await execute(phone, plan, quiet);
+    expect(phone.s.settings["system/font_scale"]).toBe("1.5");
+    reconnect(phone);
+    await restoreBackup(phone, validateBackup(JSON.parse(JSON.stringify(backup))), quiet);
+    expect(phone.s.settings["system/font_scale"]).toBe(original.settings["system/font_scale"]);
+    expect(phone.s.settings["secure/long_press_timeout"]).toBe(original.settings["secure/long_press_timeout"]);
+    expect(phone.s.settings["global/private_dns_mode"]).toBe(original.settings["global/private_dns_mode"]);
+    expect(phone.s.density.override).toBeUndefined();
+    expect(phone.s.suspended).toEqual(original.suspended);
+    for (const [pkg, mode] of Object.entries(original.appops.REQUEST_INSTALL_PACKAGES)) expect(phone.s.appops.REQUEST_INSTALL_PACKAGES[pkg], pkg).toBe(mode);
+    expect(phone.s.appops.REQUEST_INSTALL_PACKAGES["com.example.newapp"]).toBe("allow");
+  });
+
+  it("只在第一次改过的项也能还原", async () => {
+    const phone = new FakePhone(demoState());
+    const first = await runAll(phone);
+    reconnect(phone);
+    const pf = await preflight(phone, P);
+    const { backup, plan } = await prepare(phone, P, pf.device, [{ id: "long-press-delay", params: {} }], quiet);
+    mergeEarlierBackup(backup, first.backup);
+    expect(backup.rules[0].id).toBe("earlier-run");
+    await execute(phone, plan, quiet);
+    await restoreBackup(phone, backup, quiet);
+    expect(phone.s.settings["system/font_scale"]).toBe("1.0");
   });
 });

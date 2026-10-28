@@ -46,6 +46,7 @@ export function demoState(): FakeState {
       "global/private_dns_mode": "opportunistic",
       "global/development_settings_enabled": "1",
       "global/adb_enabled": "1",
+      "secure/android_id": "a1b2c3d4e5f60718",
     },
     density: { physical: 440 },
     appops: { REQUEST_INSTALL_PACKAGES: { "com.tencent.mm": "allow", "com.android.browser": "allow", "com.ss.android.ugc.aweme": "allow" } },

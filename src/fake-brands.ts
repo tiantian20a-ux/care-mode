@@ -265,5 +265,6 @@ export function brandPhone(brand: keyof typeof BRANDS): { state: FakeState; ui: 
   state.props["ro.product.model"] = b.props[2];
   state.packages = [...new Set([...Object.values(ui.pages).map((p) => p.pkg), ...b.extra, "com.tencent.mm", "com.taobao.taobao"])];
   if (brand === "vivo") state.settings["secure/switch_quick_app_service"] = "1";
+  state.settings["secure/android_id"] = `${brand}0000000000`.slice(0, 16);
   return { state, ui };
 }

@@ -20,6 +20,7 @@ import {
   skipReason,
   validateBackup,
   inspect,
+  mergeEarlierBackup,
   type ExecDiag,
   type InspectResult,
   type Log,
@@ -30,6 +31,7 @@ import {
 import { FakePhone, demoState } from "./fake-phone";
 import { brandPhone } from "./fake-brands";
 import { buildDiagnostics, readRom, type Diagnostics } from "./diag";
+import { GUIDES } from "./guide";
 
 const common = commonJson as unknown as Pack;
 const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
@@ -142,19 +144,21 @@ function home() {
 
 // ---------- 准备手机 ----------
 
-function guide() {
+function guide(brandId = "") {
+  const g = GUIDES.find((x) => x.id === brandId);
   render(`
     <h1>第一步：打开手机的 USB 调试</h1>
-    <p class="muted">这是安卓自带的功能，用完后工具会自动帮你关掉。</p>
-    <div class="card">
+    <p class="muted">这是安卓自带的功能，用完后工具会自动帮你关掉。先选手机品牌：</p>
+    <div class="chips">${GUIDES.map((x) => `<button class="chip${x.id === brandId ? " on" : ""}" data-guide="${x.id}">${esc(x.name)}</button>`).join("")}</div>
+    ${g ? `<div class="card">
       <ol class="steps">
-        <li>打开手机「设置」→「关于手机」（小米叫「我的设备」→「全部参数」，OPPO/一加叫「关于本机」→「版本信息」，vivo 叫「系统管理」→「版本信息」）。</li>
-        <li>找到「版本号」（小米是「OS 版本」），<b>连续点 7 下</b>，直到提示「已进入开发者模式」。可能要输锁屏密码。</li>
-        <li>回到设置，搜索「开发者选项」，打开它，再打开里面的 <b>USB 调试</b>。</li>
-        <li><b>小米/红米</b>还要打开「USB 调试（安全设置）」，需要登录小米账号并插 SIM 卡。</li>
-        <li>用数据线连上电脑。手机弹出「USB 用途」选「仅充电」或「传输文件」都可以。</li>
+        <li>${esc(g.version)}，<b>连续点 7 下</b>，直到提示「已进入开发者模式」或「您已处于开发者模式」。可能要输锁屏密码。</li>
+        <li>打开${esc(g.developer)}。找不到就在设置顶部的搜索框搜「开发者选项」。</li>
+        <li>打开 ${g.toggles.map((t) => `<b>${esc(t)}</b>`).join("、")}。</li>
+        <li>用数据线连上电脑。手机弹出「USB 用途」时选「传输文件」。</li>
       </ol>
-    </div>
+      ${g.note ? `<p class="muted">${esc(g.note)}</p>` : ""}
+    </div>` : ""}
     <div class="note warn">如果电脑上开着手机助手、豌豆荚、Android Studio 之类的软件，请先关掉，否则会连不上。</div>
     <div class="btns">
       <button class="primary" id="connect">连接手机</button>
@@ -162,6 +166,7 @@ function guide() {
     </div>
     <p id="status" class="muted"></p>
   `);
+  for (const b of app.querySelectorAll<HTMLButtonElement>("[data-guide]")) b.addEventListener("click", () => guide(b.dataset.guide));
   on("back", home);
   on("connect", connect);
 }
@@ -332,21 +337,33 @@ async function startBackup(pf: PreflightResult) {
   status.textContent = "正在读取手机当前设置……";
   try {
     const { backup, plan } = await prepare(shell!, pack, pf.device, selections, () => {});
+    // 这台手机以前用本工具设置过：把那次的原值合进来，免得新备份把「设置后的值」当成原值。
+    const prev = lastBackup();
+    const merged = prev?.deviceId && prev.deviceId === backup.deviceId ? mergeEarlierBackup(backup, prev) : 0;
     rememberBackup(backup);
     download(backup);
-    confirmBackup(backup, plan);
+    confirmBackup(backup, plan, merged);
   } catch (e) {
     status.innerHTML = `<span style="color:var(--bad)">备份失败，没有改动手机：${esc((e as Error).message)}</span>`;
   }
 }
 
-function confirmBackup(backup: Backup, plan: PlannedRule[]) {
+function forgetBackup() {
+  try {
+    localStorage.removeItem("care-mode:last-backup");
+  } catch {
+    // 同上
+  }
+}
+
+function confirmBackup(backup: Backup, plan: PlannedRule[], merged = 0) {
   const devOff = plan.some((p) => p.rule.runLast);
   render(`
     <h1>第三步：确认备份已保存</h1>
     <div class="card">
       <p>备份文件已经开始下载，文件名以 <b>care-mode-backup</b> 开头，一般在电脑的「下载」文件夹里。</p>
       <p class="muted">没看到的话可以 <button class="link" id="again">再下载一次</button>。</p>
+      ${backup.mergedFrom ? `<p>这台手机 ${esc(backup.mergedFrom.slice(0, 10))} 用本工具设置过。新备份已经合并了那一次的记录${merged ? `（${merged} 项以第一次设置前的原值为准）` : ""}，用这一份就能还原到最初的样子，旧备份可以不要了。</p>` : ""}
     </div>
     <div class="card">
       <p><b>将要执行 ${plan.length} 项：</b></p>
@@ -474,6 +491,8 @@ function restoreConfirm(backup: Backup) {
       const { log, el } = logView();
       document.getElementById("logbox")!.appendChild(el);
       const failures = await restoreBackup(shell, backup, log);
+      // 已经还原了，下次再设置时不要再合并这份旧记录。
+      if (lastBackup()?.createdAt === backup.createdAt) forgetBackup();
       log(failures ? "warn" : "ok", failures ? `还原完成，有 ${failures} 项要手动处理（见上面）。` : "全部还原完成。");
       app.insertAdjacentHTML("beforeend", `<div class="note info">手机已还原。如果不再需要，可以在设置里关掉开发者选项。</div><div class="btns"><button id="home">回到首页</button></div>`);
       on("home", home);

@@ -250,6 +250,7 @@ export async function prepare(sh: Shell, pack: Pack, device: DeviceInfo, selecti
     createdAt: new Date().toISOString(),
     pack: { name: pack.pack, version: pack.version },
     device,
+    deviceId: await deviceId(sh),
     rules: plan.map((p) => ({ id: p.rule.id, title: p.rule.title, restore: p.restore })),
   };
   return { backup, plan };
@@ -346,6 +347,56 @@ export async function execute(sh: Shell, plan: PlannedRule[], log: Log, diag?: E
 }
 
 // ---------- 还原 ----------
+
+/** 认同一台手机用：android_id 做 SHA-256，只留前 16 位。读不到就不认。 */
+export async function deviceId(sh: Shell): Promise<string | undefined> {
+  const raw = parseSetting((await sh.run("settings get secure android_id")).out);
+  if (!raw || !globalThis.crypto?.subtle) return undefined;
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`care-mode:${raw}`)));
+  return [...hash.slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function opKey(op: RestoreOp): string {
+  switch (op.op) {
+    case "setting":
+      return `setting:${op.ns}:${op.key}`;
+    case "density":
+      return "density";
+    case "appop":
+      return `appop:${op.pkg}:${op.name}`;
+    case "unsuspend":
+      return `suspend:${op.pkg}`;
+    case "channel_on":
+      return `channel:${op.pkg}:${op.channel}`;
+    case "package_network":
+      return `net:${op.pkg}`;
+    case "manual":
+      return `manual:${op.text}`;
+  }
+}
+
+/**
+ * 同一台手机再次设置时，新备份记下的「原值」其实是上次设置后的值。
+ * 把更早那份备份合进来：同一项以更早的原值为准；只在更早那次改过的项，放在最前面（还原时最后处理）。
+ * 原地修改 newer，因为执行时还会往各条规则的还原清单里追加手动项。
+ */
+export function mergeEarlierBackup(newer: Backup, older: Backup): number {
+  const earlier = new Map<string, RestoreOp>();
+  for (const r of older.rules) for (const op of r.restore) if (!earlier.has(opKey(op))) earlier.set(opKey(op), op);
+  let kept = 0;
+  for (const r of newer.rules) {
+    for (const [i, op] of r.restore.entries()) {
+      const old = earlier.get(opKey(op));
+      if (!old) continue;
+      if (JSON.stringify(old) !== JSON.stringify(op)) kept++;
+      r.restore[i] = old;
+      earlier.delete(opKey(op));
+    }
+  }
+  if (earlier.size) newer.rules.unshift({ id: "earlier-run", title: "之前那次设置", restore: [...earlier.values()] });
+  newer.mergedFrom = older.mergedFrom ?? older.createdAt;
+  return kept + earlier.size;
+}
 
 export function validateBackup(data: unknown): Backup {
   const b = data as Backup;

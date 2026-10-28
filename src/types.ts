@@ -89,6 +89,10 @@ export interface Backup {
   createdAt: string;
   pack: { name: string; version: string };
   device: DeviceInfo;
+  /** android_id 的哈希前缀，用来认出同一台手机，不存原值。 */
+  deviceId?: string;
+  /** 合并了哪一次更早的备份（它的 createdAt）：再次设置时保留第一次设置前的原值。 */
+  mergedFrom?: string;
   rules: { id: string; title: string; restore: RestoreOp[] }[];
 }
 
