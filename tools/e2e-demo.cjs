@@ -1,5 +1,5 @@
 // 用 Playwright 在演示模式下走一遍完整流程（设置 → 下载备份 → 执行 → 还原）。
-// 用法：npm run build && npx vite preview --port 4173，然后 node tools/e2e-demo.cjs <截图目录>
+// 用法：npm run build && npx vite preview --port 4173，然后 node tools/e2e-demo.cjs <截图目录> [oppo|vivo|honor]
 const { chromium } = require('playwright');
 (async () => {
   const S = process.argv[2];
@@ -9,14 +9,16 @@ const { chromium } = require('playwright');
   const errors = [];
   p.on('pageerror', e => errors.push(e.message));
   p.on('console', m => m.type() === 'error' && errors.push(m.text()));
-  await p.goto('http://localhost:4173/?demo');
+  await p.goto('http://localhost:4173/?demo' + (process.argv[3] ? '=' + process.argv[3] : ''));
   await p.screenshot({ path: S + '/1-home.png', fullPage: true });
   await p.click('#start');
   await p.click('#connect');
   await p.waitForSelector('#go', { timeout: 20000 });
   await p.screenshot({ path: S + '/2-review.png', fullPage: true });
   // consent missing → message
-  await p.check('#r-quick-apps'); await p.check('#r-xiaomi-msa'); await p.check('input[data-consent="xiaomi-msa"]');
+  const brandRule = { '': 'xiaomi-msa', oppo: 'oppo-ad-packages', vivo: 'vivo-quickapp', honor: '' }[process.argv[3] || ''];
+  await p.check('#r-quick-apps');
+  if (brandRule) { await p.check('#r-' + brandRule); await p.check(`input[data-consent="${brandRule}"]`); }
   await p.click('#go');
   console.log('consent msg:', await p.textContent('#status'));
   await p.check('input[data-consent="quick-apps"]');

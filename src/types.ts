@@ -10,7 +10,7 @@ export interface Param {
 }
 
 export type Action =
-  | { type: "setting"; ns: "system" | "secure" | "global"; key: string; value: string; noRestore?: boolean }
+  | { type: "setting"; ns: "system" | "secure" | "global"; key: string; value: string; noRestore?: boolean; onlyIfExists?: boolean }
   | { type: "wm_density"; factor: string }
   | { type: "appop_revoke_all"; op: string; from: string; to: string }
   | { type: "suspend"; onlyIfInstalled?: boolean; packages: { pkg: string; brand: string; verified: boolean }[] }

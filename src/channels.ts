@@ -73,6 +73,8 @@ async function dumpUi(sh: Shell): Promise<UiNode[]> {
 /** 类别设置页最上面那个开关就是「允许通知」。锁屏或页面不对时返回 undefined。 */
 function mainSwitch(nodes: UiNode[]): UiNode | undefined {
   if (!nodes.length || nodes[0].pkg === "com.android.systemui") return undefined;
+  // vivo 的通知页由 systemuiplugin 处理，最上面的「允许通知」是整个应用的总开关，关了会连订单、聊天通知一起关。
+  if (nodes.some((n) => n.pkg === "com.vivo.systemuiplugin")) return undefined;
   return nodes.filter((n) => n.checkable && n.y2 > n.y1).sort((a, b) => a.y1 - b.y1)[0];
 }
 

@@ -9,6 +9,10 @@ export interface FakeItem {
   to?: string;
   /** 放在底部标签栏。 */
   tab?: boolean;
+  /** 单选项（比如「简洁」「不显示」），点了记到 FakeUi.picked。 */
+  pick?: boolean;
+  /** 点了以后执行，比如菜单里的「全部关闭」。 */
+  act?: (ui: FakeUi) => void;
 }
 
 export interface FakePage {
@@ -20,6 +24,10 @@ export interface FakePage {
   gear?: string;
   /** 打开时先弹一个更新框。 */
   popup?: boolean;
+  /** 打开时弹出键盘，第一次按返回只收键盘。 */
+  keyboard?: boolean;
+  /** 右上角一排没有文字的图标，按 resource-id 区分。 */
+  icons?: { rid: string; to: string }[];
 }
 
 const W = 1080;
@@ -35,6 +43,10 @@ export class FakeUi {
   stack: { id: string; offset: number }[] = [];
   popupShown = new Set<string>();
   popupOpen = false;
+  keyboardOpen = false;
+  picked: string[] = [];
+  /** 在桌面上的手势打开哪一页：right=从左向右滑（负一屏），down=下拉（搜索）。 */
+  gestures: { right?: string; down?: string } = {};
 
   constructor(public pages: Record<string, FakePage>, public launchers: Record<string, string>) {}
 
@@ -54,6 +66,7 @@ export class FakeUi {
   open(id: string) {
     this.stack.push({ id, offset: 0 });
     const p = this.pages[id];
+    this.keyboardOpen = !!p.keyboard;
     if (p.popup && !this.popupShown.has(id)) {
       this.popupShown.add(id);
       this.popupOpen = true;
@@ -68,8 +81,16 @@ export class FakeUi {
     return true;
   }
 
+  gesture(kind: "right" | "down") {
+    if (this.stack.length) return false;
+    const id = this.gestures[kind];
+    if (id) this.open(id);
+    return !!id;
+  }
+
   back() {
     if (this.popupOpen) this.popupOpen = false;
+    else if (this.keyboardOpen) this.keyboardOpen = false;
     else this.stack.pop();
   }
 
@@ -98,6 +119,10 @@ export class FakeUi {
       return;
     }
     if (p.gear && x >= 960 && y >= 100 && y <= 200) return this.open(p.gear);
+    if (p.icons && y >= 100 && y <= 200) {
+      const i = Math.floor((x - 560) / 120);
+      if (p.icons[i]) return this.open(p.icons[i].to);
+    }
     const tabs = p.items.filter((i) => i.tab);
     if (y >= 2250 && tabs.length) {
       const t = tabs[Math.min(tabs.length - 1, Math.floor(x / (W / tabs.length)))];
@@ -107,7 +132,9 @@ export class FakeUi {
     if (y < LIST_TOP || y >= LIST_BOTTOM) return;
     const item = this.list(p)[this.top.offset + Math.floor((y - LIST_TOP) / ROW)];
     if (!item) return;
-    if (item.on !== undefined && x >= 880) item.on = !item.on;
+    if (item.act) item.act(this);
+    else if (item.pick) this.picked.push(`${this.top.id}·${item.text}`);
+    else if (item.on !== undefined && x >= 880) item.on = !item.on;
     else if (item.to) this.open(item.to);
     else if (item.on !== undefined) item.on = !item.on;
   }
@@ -149,11 +176,18 @@ export class FakeUi {
         { class: "android.widget.FrameLayout", bounds: `[0,0][${W},${H}]` },
         node({ text: p.title, class: "android.widget.TextView", bounds: "[40,100][700,200]" }) +
           (p.gear ? node({ "content-desc": "设置", class: "android.widget.ImageView", clickable: true, bounds: "[960,100][1060,200]" }) : "") +
+          (p.icons ?? []).map((ic, i) => node({ "resource-id": `${p.pkg}:id/${ic.rid}`, class: "android.widget.ImageView", clickable: true, bounds: `[${560 + i * 120},100][${660 + i * 120},200]` })).join("") +
           node({ class: "androidx.recyclerview.widget.RecyclerView", scrollable, bounds: `[0,${LIST_TOP}][${W},${LIST_BOTTOM}]` }, rows || node({ bounds: `[0,${LIST_TOP}][1,${LIST_TOP + 1}]` })) +
           tabNodes,
       );
     }
     return `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">${body}</hierarchy>`;
+  }
+
+  /** 加一组页面（另一个品牌的应用）。 */
+  add(pages: Record<string, FakePage>, launchers: Record<string, string>) {
+    Object.assign(this.pages, pages);
+    Object.assign(this.launchers, launchers);
   }
 }
 

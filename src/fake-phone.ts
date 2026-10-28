@@ -240,6 +240,10 @@ export class FakePhone implements Shell {
     }
     if ((m = /^input swipe (\d+) (\d+) (\d+) (\d+) \d+$/.exec(cmd)) && (m[1] !== m[3] || m[2] !== m[4])) {
       if (!s.inputAllowed) return err("INJECT_EVENTS permission denied\n");
+      const dx = Number(m[3]) - Number(m[1]);
+      const dy = Number(m[4]) - Number(m[2]);
+      if (Math.abs(dx) > Math.abs(dy) && dx > 0 && this.ui.gesture("right")) return ok();
+      if (dy > 0 && this.ui.gesture("down")) return ok();
       this.ui.scroll(Number(m[2]) - Number(m[4]));
       return ok();
     }

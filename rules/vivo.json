@@ -1,0 +1,157 @@
+{
+  "pack": "vivo",
+  "title": "vivo / iQOO 专属",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "vivo",
+      "iQOO"
+    ],
+    "manufacturer": [
+      "vivo"
+    ]
+  },
+  "credits": "设置路径来自 android-ad-cleaner（MIT）在 vivo X300 Ultra（OriginOS 6）上的手动实测，整段自动执行还没有真机验证过。其他版本入口可能不同，找不到会自动跳过。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "vivo-quickapp",
+      "title": "关闭快应用服务",
+      "why": "vivo 系统不允许暂停快应用，改用系统自带的快应用服务开关关掉，挡住广告里直接弹出来的页面。",
+      "tier": "consent",
+      "caution": "快应用里的小游戏、小程序会打不开，可以一键恢复。这台手机没有这个开关时自动跳过。",
+      "actions": [
+        {
+          "type": "setting",
+          "ns": "secure",
+          "key": "switch_quick_app_service",
+          "value": "0",
+          "onlyIfExists": true
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-ads",
+      "title": "系统：关个性化广告和智能推荐",
+      "why": "设置 → 安全 → 更多安全设置 → 广告与隐私。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "系统广告"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-search",
+      "title": "全局搜索：关推荐词、推荐卡片和热搜",
+      "why": "历史记录、应用建议、搜索结果个性化保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "全局搜索"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-assistant",
+      "title": "负一屏：关服务推荐和资讯",
+      "why": "桌面最左边一屏的推广和资讯。小V建议（航班、快递）、常用工具图标保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "负一屏"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-lockscreen",
+      "title": "关闭阅图锁屏",
+      "why": "锁屏上的图文推送。锁屏壁纸不变。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "阅图锁屏"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-market",
+      "title": "应用商店：关个性化推荐和推广位",
+      "why": "签到有礼、顶部轮播、开屏、摇一摇、悬浮窗、限时推广。我的服务、空间清理保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "应用商店"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-browser",
+      "title": "浏览器：极简首页，关资讯和推荐",
+      "why": "首页改成极简，关上滑资讯、个性化内容、下载推荐、连 WiFi 跳新闻。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "浏览器"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-secure",
+      "title": "i 管家：关应用个性化推荐",
+      "why": "i 管家里推荐的应用。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "i管家"
+        }
+      ]
+    },
+    {
+      "id": "vivo-ui-weather",
+      "title": "天气：关热点资讯通知",
+      "why": "气象预警、异常天气、地震预警保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "vivo",
+          "segment": "天气"
+        }
+      ]
+    }
+  ]
+}

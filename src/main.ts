@@ -1,6 +1,9 @@
 import "./style.css";
 import commonJson from "../rules/common.json";
 import xiaomiJson from "../rules/xiaomi.json";
+import oppoJson from "../rules/oppo.json";
+import vivoJson from "../rules/vivo.json";
+import honorJson from "../rules/honor.json";
 import type { Backup, Pack, Rule, Shell } from "./types";
 import {
   brandPackFor,
@@ -20,9 +23,10 @@ import {
   type PreflightResult,
 } from "./engine";
 import { FakePhone, demoState } from "./fake-phone";
+import { brandPhone } from "./fake-brands";
 
 const common = commonJson as unknown as Pack;
-const brandPacks = [xiaomiJson as unknown as Pack];
+const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson] as unknown as Pack[];
 /** 连上手机后换成「通用 + 这个品牌」合并后的规则包。 */
 let pack: Pack = common;
 let brand: Pack | undefined;
@@ -32,6 +36,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 let shell: Shell | undefined;
 let demo = false;
+/** 演示用哪个品牌的模拟手机：?demo=oppo / vivo / honor，默认小米。 */
+let demoBrand = "";
 
 // ---------- 小工具 ----------
 
@@ -86,7 +92,13 @@ function lastBackup(): Backup | undefined {
 }
 
 async function getShell(onAuth: () => void): Promise<Shell | undefined> {
-  if (demo) return new FakePhone(demoState(), 30);
+  if (demo) {
+    if (demoBrand === "oppo" || demoBrand === "vivo" || demoBrand === "honor") {
+      const { state, ui } = brandPhone(demoBrand);
+      return new FakePhone(state, 30, ui);
+    }
+    return new FakePhone(demoState(), 30);
+  }
   const { connectUsb } = await import("./adb-usb");
   return connectUsb(onAuth);
 }
@@ -211,7 +223,7 @@ function review(pf: PreflightResult) {
       ${brand ? `<h2>${esc(brand.title)}</h2>
       ${brand.credits ? `<p class="muted">${esc(brand.credits)}</p>` : ""}
       <div class="card">${orderedRules(pack).filter((r) => r.group).map((r) => ruleRow(r, pf)).join("")}</div>`
-        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO。</div>`}
+        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO、OPPO / 一加 / realme、vivo / iQOO、荣耀。</div>`}
       <h2>收尾</h2>
       <div class="card">${orderedRules(pack).filter((r) => r.runLast).map((r) => ruleRow(r, pf)).join("")}</div>
       <div class="note info">下一步会先读取手机当前的设置，生成备份文件下载到电脑。<b>请保存好这个文件</b>，以后还原要用。</div>
@@ -400,5 +412,7 @@ function restoreConfirm(backup: Backup) {
   });
 }
 
-demo = new URLSearchParams(location.search).has("demo");
+const query = new URLSearchParams(location.search);
+demo = query.has("demo");
+demoBrand = (query.get("demo") ?? "").toLowerCase();
 home();

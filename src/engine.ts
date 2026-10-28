@@ -16,6 +16,17 @@ const KEY_RE = /^[\w.]+$/;
 const OP_RE = /^[A-Z_]+$/;
 const MODES = new Set(["allow", "deny", "ignore", "default", "foreground", "errored"]);
 const NS = new Set(["system", "secure", "global"]);
+// 暂停了会坏功能的包，规则包写了也不执行（下拉搜索、负一屏、系统界面、各家应用商店）。
+const NEVER_SUSPEND = new Set([
+  "com.heytap.quicksearchbox",
+  "com.coloros.assistantscreen",
+  "com.android.systemui",
+  "com.vivo.systemuiplugin",
+  "com.heytap.market",
+  "com.xiaomi.market",
+  "com.hihonor.appmarket",
+  "com.heytap.mcs",
+]);
 
 function fill(text: string, values: Record<string, string>): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, k: string) => {
@@ -141,6 +152,8 @@ async function planAction(sh: Shell, a: Action, values: Record<string, string>):
     case "setting": {
       const value = fill(a.value, values);
       const prev = parseSetting((await sh.run(`settings get ${a.ns} ${a.key}`)).out);
+      // 品牌专属的开关（比如 vivo 的快应用服务）：这台手机没有就不写，免得凭空多出一项设置。
+      if (a.onlyIfExists && prev === null) return { steps: [], restore: [] };
       return {
         steps: [{ kind: "cmd", cmd: `settings put ${a.ns} ${a.key} ${shQuote(value)}`, tolerateDisconnect: a.noRestore }],
         restore: a.noRestore ? [] : [{ op: "setting", ns: a.ns, key: a.key, value: prev }],
@@ -165,6 +178,7 @@ async function planAction(sh: Shell, a: Action, values: Record<string, string>):
     case "suspend": {
       const todo: string[] = [];
       for (const { pkg } of a.packages) {
+        if (NEVER_SUSPEND.has(pkg)) continue;
         const listed = (await sh.run(`pm list packages ${pkg}`)).out.split("\n").map((l) => l.trim());
         if (a.onlyIfInstalled && !listed.includes(`package:${pkg}`)) continue;
         const dump = (await sh.run(`dumpsys package ${pkg}`)).out;

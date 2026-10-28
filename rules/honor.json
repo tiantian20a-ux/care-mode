@@ -1,0 +1,155 @@
+{
+  "pack": "honor",
+  "title": "荣耀专属",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "HONOR"
+    ],
+    "manufacturer": [
+      "HONOR"
+    ]
+  },
+  "credits": "设置路径来自 android-ad-cleaner（MIT）在荣耀 PNM-AN10（MagicOS 10）上的实测。YOYO 建议、魔法画报、音乐、阅读这几项暂时需要手动关。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "honor-ui-adtrack",
+      "title": "系统：关闭所有应用的广告标识和智能推荐",
+      "why": "设置 → 隐私和安全 → 广告与隐私，包括系统应用，一次全部关闭。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "广告跟踪"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-search",
+      "title": "下拉搜索：关热搜和个性化",
+      "why": "搜索页的热搜榜、热搜词推荐和个性化管理。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "下拉搜索"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-assistant",
+      "title": "负一屏：关智能推荐、个性化广告和资讯",
+      "why": "桌面最左边一屏的推广内容。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "负一屏"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-folders",
+      "title": "桌面文件夹：关推荐应用",
+      "why": "「精品应用」「热门推荐」文件夹底部推荐的没装过的应用。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "桌面文件夹"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-market",
+      "title": "应用市场：关营销推荐和活动消息",
+      "why": "营销服务推荐、个性化服务推荐、活动福利、游戏动态。应用更新保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "应用市场"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-browser",
+      "title": "浏览器：简洁首页，关推送和互动广告",
+      "why": "新闻热点和兴趣推送、个性化内容、摇一摇等互动广告。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "浏览器"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-themes",
+      "title": "主题：关推荐通知和个性化服务",
+      "why": "主题里的内容推荐和活动信息。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "主题"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-video",
+      "title": "视频：关个性化内容和广告",
+      "why": "荣耀版优酷的个性化内容、个性化广告、OAID。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "视频"
+        }
+      ]
+    },
+    {
+      "id": "honor-ui-manager",
+      "title": "系统管家：关应用推荐",
+      "why": "清理、查杀、拦截功能不动。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "honor",
+          "segment": "系统管家"
+        }
+      ]
+    }
+  ]
+}

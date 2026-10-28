@@ -188,7 +188,7 @@
       "title": "暂停快应用",
       "why": "快应用不用安装就能从广告里直接弹出来，是很多弹窗和诱导页面的来源。",
       "tier": "consent",
-      "caution": "暂停后快应用里的小游戏、小程序打不开，可以一键恢复。",
+      "caution": "暂停后快应用里的小游戏、小程序打不开，可以一键恢复。vivo 系统不允许暂停，改用 vivo 专属规则里的开关。",
       "actions": [
         {
           "type": "suspend",
@@ -200,23 +200,43 @@
               "verified": true
             },
             {
+              "pkg": "com.miui.hybrid.accessory",
+              "brand": "小米/红米",
+              "verified": false
+            },
+            {
               "pkg": "com.nearme.instant.platform",
               "brand": "OPPO/一加/realme",
               "verified": true
             },
             {
-              "pkg": "com.vivo.hybrid",
-              "brand": "vivo/iQOO",
+              "pkg": "com.oppo.instant.local.service",
+              "brand": "OPPO/一加/realme",
+              "verified": true
+            },
+            {
+              "pkg": "com.nearme.instant.card",
+              "brand": "OPPO/一加/realme",
+              "verified": true
+            },
+            {
+              "pkg": "com.hihonor.quickengine",
+              "brand": "荣耀",
+              "verified": true
+            },
+            {
+              "pkg": "com.hihonor.quickgame",
+              "brand": "荣耀",
+              "verified": true
+            },
+            {
+              "pkg": "com.honor.quickgamecenter",
+              "brand": "荣耀",
               "verified": true
             },
             {
               "pkg": "com.huawei.fastapp",
               "brand": "华为",
-              "verified": true
-            },
-            {
-              "pkg": "com.hihonor.fastapp",
-              "brand": "荣耀",
               "verified": false
             }
           ]

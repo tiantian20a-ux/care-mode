@@ -527,6 +527,47 @@ export class Ui {
     }
   }
 
+  /** 打开系统设置，按顺序点菜单。中途找不到返回 false。 */
+  async settingsPage(...path: string[]): Promise<boolean> {
+    this.miss = 0;
+    await this.sh.run("am start -f 0x10008000 -a android.settings.SETTINGS");
+    await this.sleep(1500);
+    for (const t of path) if (!(await this.tap(t))) return false;
+    return true;
+  }
+
+  /** 回桌面（按两次，确保在主屏）。 */
+  async home() {
+    await this.sh.run("input keyevent HOME");
+    await this.sleep(600);
+    await this.sh.run("input keyevent HOME");
+    await this.sleep(600);
+  }
+
+  /** 桌面从左边缘向右滑，打开负一屏。 */
+  async swipeRight() {
+    const y = Math.floor(this.H / 2);
+    await this.sh.run(`input swipe ${Math.floor(this.W / 7)} ${y} ${Math.floor((this.W * 6) / 7)} ${y} 250`);
+    await this.sleep(1200);
+  }
+
+  /** 桌面中间向下滑，打开下拉搜索，再按返回收起键盘。 */
+  async pullDown() {
+    const x = Math.floor(this.W / 2);
+    await this.sh.run(`input swipe ${x} ${Math.floor((this.H * 3) / 10)} ${x} ${Math.floor((this.H * 7) / 10)} 300`);
+    await this.sleep(1500);
+    await this.sh.run("input keyevent BACK");
+    await this.sleep(500);
+  }
+
+  /** 点 resource-id 以 rid 结尾的第 index 个可见元素（没有文字的图标按钮）。 */
+  async tapRid(rid: string, index = 0): Promise<boolean> {
+    const hits = (await this.tree()).filter((n) => n.rid.endsWith(rid) && this.onScreen(n));
+    if (!hits[index]) return false;
+    await this.clickNode(hits[index], 1000);
+    return true;
+  }
+
   /** 右上角没有文字的「设置」齿轮；找不到就试「设置」字样和「更多」菜单。 */
   async gear(toolbarOnly = false): Promise<boolean> {
     let nodes = await this.tree();

@@ -1,0 +1,184 @@
+{
+  "pack": "oppo",
+  "title": "OPPO / 一加 / realme 专属",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "OPPO",
+      "OnePlus",
+      "realme"
+    ],
+    "manufacturer": [
+      "OPPO",
+      "OnePlus",
+      "realme"
+    ]
+  },
+  "credits": "设置路径来自 android-ad-cleaner（MIT）在 OPPO Find N6（ColorOS 16）和一加 Ace 2 Pro（ColorOS 14）上的实测。其他机型和氧 OS 的入口可能不同，找不到会自动跳过。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "oppo-ad-packages",
+      "title": "暂停广告服务和乐划锁屏",
+      "why": "com.opos.ads 是 OPPO 的广告服务，com.heytap.pictorial 是锁屏杂志（乐划锁屏）。暂停后系统应用里的广告和锁屏杂志会减少。",
+      "tier": "consent",
+      "caution": "只暂停、不卸载，可以一键恢复。锁屏杂志会消失。实测发现部分进程会被系统重新拉起，不能保证广告完全消失。",
+      "actions": [
+        {
+          "type": "suspend",
+          "onlyIfInstalled": true,
+          "packages": [
+            {
+              "pkg": "com.opos.ads",
+              "brand": "OPPO/一加/realme",
+              "verified": true
+            },
+            {
+              "pkg": "com.heytap.pictorial",
+              "brand": "OPPO/一加/realme",
+              "verified": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-adtrack",
+      "title": "系统：关闭所有应用的广告跟踪",
+      "why": "设置 → 隐私 → 设备标识与广告 → 广告跟踪。每个应用一个开关，没有总开关，新装的应用默认打开。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "广告跟踪"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-assistant",
+      "title": "负一屏：关提示词、热点资讯和轮播推荐",
+      "why": "桌面最左边一屏的推广内容。不关「推荐服务」总开关，天气、步数卡片保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "负一屏"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-search",
+      "title": "下拉搜索：关榜单、推荐卡片和提示词",
+      "why": "桌面下滑搜索页里的热榜、未下载应用推荐。「APP内搜索」保留，否则搜不到本机应用。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "下拉搜索"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-market",
+      "title": "软件商店：关个性化推荐和推广位",
+      "why": "商店首页的悬浮活动、弹窗、轮播卡片、活动专区等 30 多个推广位。安全检测、更新、清理保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "软件商店"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-browser",
+      "title": "浏览器：简洁首页，关开屏和资讯广告",
+      "why": "首页改成简洁布局（资讯流和活动图消失），关开屏广告、资讯列表广告和个性化推荐。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "浏览器"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-themes",
+      "title": "主题商店：关推送、开屏广告和个性化推荐",
+      "why": "主题商店的消息通知和开屏广告。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "主题商店"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-video",
+      "title": "视频：关个性化推荐",
+      "why": "OPPO 视频的个性化推荐。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "视频"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-games",
+      "title": "游戏中心：关个性化推荐",
+      "why": "游戏中心的个性化推荐。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "游戏中心"
+        }
+      ]
+    },
+    {
+      "id": "oppo-ui-breeno",
+      "title": "小布建议：关资讯服务",
+      "why": "小布建议里的资讯推送。快递、航班、日程提醒保留。",
+      "tier": "recommended",
+      "executor": "ui",
+      "caution": "会自动打开这个应用点设置，期间请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "oppo",
+          "segment": "小布建议"
+        }
+      ]
+    }
+  ]
+}
