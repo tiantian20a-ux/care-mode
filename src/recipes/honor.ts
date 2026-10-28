@@ -14,9 +14,9 @@ export const honor: Record<string, (ui: Ui) => Promise<void>> = {
         await ui.tap("显示系统程序", { scrolls: 0 });
         await ui.tap("更多选项", { exact: false, scrolls: 0 });
       }
-      if (await ui.tap("全部关闭", { scrolls: 0 })) {
+      if (await ui.choose("全部关闭")) {
         await ui.confirm();
-        ui.changed.push({ page: "系统 · 广告与隐私", title: "所有应用的广告标识读取（全部关闭）", to: false });
+        if (!ui.dryRun) ui.changed.push({ page: "系统 · 广告与隐私", title: "所有应用的广告标识读取（全部关闭）", to: false });
       }
     }
     await ui.start("com.hihonor.id", ".oaid.ui.IntelligentRecommendActivity");
@@ -106,7 +106,7 @@ export const honor: Record<string, (ui: Ui) => Promise<void>> = {
       await ui.tap("设置", { scrolls: 0 });
     }
     if (await ui.maybe("模式选择")) {
-      await ui.tap("简洁首页", { scrolls: 0 });
+      await ui.choose("简洁首页");
       await ui.back();
     }
     if (await ui.maybe("消息通知")) {

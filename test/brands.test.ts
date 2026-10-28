@@ -7,10 +7,11 @@ import xiaomiJson from "../rules/xiaomi.json";
 import huaweiJson from "../rules/huawei.json";
 import samsungJson from "../rules/samsung.json";
 import type { Pack } from "../src/types";
-import { FakePhone } from "../src/fake-phone";
+import { FakePhone, demoState } from "../src/fake-phone";
+import { fakeXiaomiApps } from "../src/fake-ui";
 import { switchStates } from "../src/fake-ui";
 import { brandPhone } from "../src/fake-brands";
-import { brandPackFor, execute, mergePacks, preflight, prepare, restoreBackup, validateBackup, type Log } from "../src/engine";
+import { type ExecDiag, brandPackFor, execute, inspect, mergePacks, preflight, prepare, restoreBackup, validateBackup, type Log } from "../src/engine";
 
 const common = commonJson as unknown as Pack;
 const packs = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
@@ -261,5 +262,63 @@ describe("三星（模拟界面按公开教程搭，只测代码路径）", () =
     const { plan } = await prepare(phone, pack, pf.device, [{ id: "samsung-ui-customization", params: {} }], quiet);
     await execute(phone, plan, quiet);
     expect(switchStates(ui)["custom·定制广告和直接营销"]).toBe(true);
+  });
+});
+
+describe("诊断文件", () => {
+  it("没找到入口时记下当时的屏幕和应用版本", async () => {
+    const { state, ui } = brandPhone("huawei");
+    ui.pages.settings.items = [{ text: "WLAN", to: "none" }, { text: "安全", to: "none" }];
+    const phone = new FakePhone(state, 0, ui);
+    const pf = await preflight(phone, common);
+    const pack = mergePacks(common, brandPackFor(pf.device, packs));
+    const { plan } = await prepare(phone, pack, pf.device, [{ id: "huawei-ui-adprivacy", params: {} }, { id: "huawei-ui-browser", params: {} }], quiet);
+    const diag: ExecDiag = { snaps: [] };
+    await execute(phone, plan, quiet, diag);
+    const miss = diag.snaps.filter((x) => x.rule === "huawei-ui-adprivacy");
+    expect(miss.length).toBeGreaterThan(0);
+    expect(miss[0].note).toContain("没找到");
+    expect(miss[0].focus).toContain("com.android.settings");
+    expect(miss[0].appVersion).toBe("1.0.0-demo");
+    expect(miss[0].screen.some((l) => l.includes('"安全"'))).toBe(true);
+    // 浏览器那段路径对得上，不留记录
+    expect(diag.snaps.some((x) => x.rule === "huawei-ui-browser")).toBe(false);
+  });
+});
+
+describe("只检查，不改设置", () => {
+  const phones = {
+    xiaomi: () => ({ state: demoState(), ui: fakeXiaomiApps() }),
+    oppo: () => brandPhone("oppo"),
+    vivo: () => brandPhone("vivo"),
+    honor: () => brandPhone("honor"),
+    huawei: () => brandPhone("huawei"),
+    samsung: () => brandPhone("samsung"),
+  };
+  it.each(Object.keys(phones))("%s：找到要改的开关，但一个都不动", async (name) => {
+    const { state, ui } = phones[name as keyof typeof phones]();
+    const phone = new FakePhone(state, 0, ui);
+    const settingsBefore = JSON.stringify(phone.s.settings);
+    const before = switchStates(ui);
+    const pf = await preflight(phone, common);
+    const brandPack = brandPackFor(pf.device, packs)!;
+    const pack = mergePacks(common, brandPack);
+    const sel = pack.rules.filter((r) => r.tier !== "optional" || r.group).map((r) => ({ id: r.id, params: {} }));
+    const { plan } = await prepare(phone, pack, pf.device, sel, quiet);
+    const logs: string[] = [];
+    const diag: ExecDiag = { snaps: [] };
+    const result = await inspect(phone, plan, (_, t) => logs.push(t), diag);
+    const after = switchStates(ui);
+    // 荣耀的「显示系统程序」只是多列出几个应用，不算改设置。
+    for (const k of Object.keys(before)) expect(after[k], k).toBe(before[k]);
+    expect(ui.picked).toEqual([]);
+    expect(JSON.stringify(phone.s.settings)).toBe(settingsBefore);
+    expect(phone.s.suspended).toEqual(state.suspended);
+    for (const r of brandPack.rules.filter((r) => r.executor === "ui")) {
+      expect(result[r.id].problems, `${r.id}\n${logs.join("\n")}`).toBe(0);
+      expect(result[r.id].changes, r.id).toBeGreaterThan(0);
+    }
+    expect(diag.snaps.some((x) => x.note.startsWith("检查："))).toBe(true);
+    if (name === "oppo") expect(result["oppo-ui-adtrack"].changes).toBe(12); // 翻页重叠的行不重复计数
   });
 });

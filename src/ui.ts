@@ -96,12 +96,43 @@ export type Say = (text: string) => void;
 
 export class UiError extends Error {}
 
+/** 出问题时记下的屏幕内容，放进诊断文件，方便远程排查真机上的入口名。 */
+export interface Snap {
+  note: string;
+  focus: string;
+  /** 前台应用的版本号，入口名常常随版本变。 */
+  appVersion?: string;
+  /** 每行一个有文字或可点的控件：[左,上,右,下] 类名 "文字" desc= rid= 和状态。 */
+  screen: string[];
+}
+
+const MAX_SNAPS = 120;
+
+/** 把控件树压成几行文字，比原始 XML 小很多。 */
+export function screenLines(nodes: Node[]): string[] {
+  return nodes
+    .filter((n) => n.visible && (n.text || n.desc || n.checkable || (n.clickable && n.rid)))
+    .map((n) => {
+      const flags = [n.checkable ? (n.checked ? "开" : "关") : "", n.clickable ? "可点" : "", n.scrollable ? "可滚" : ""].filter(Boolean).join(",");
+      return [`[${n.b.join(",")}]`, n.cls.split(".").pop(), n.text && JSON.stringify(n.text), n.desc && `desc=${JSON.stringify(n.desc)}`, n.rid && `rid=${n.rid.split("/").pop()}`, flags && `(${flags})`]
+        .filter(Boolean)
+        .join(" ");
+    });
+}
+
 export class Ui {
   W = 1080;
   H = 2400;
   /** 本段已经没找到几次；>0 说明路径对不上，后面只看当前屏、不再翻页找。 */
   miss = 0;
   changed: { page: string; title: string; to: boolean }[] = [];
+  snaps: Snap[] = [];
+  /** 只检查模式：照常打开页面、找开关，但不点开关、不改选项。 */
+  dryRun = false;
+  /** 只检查模式下找到的、本来会改的开关。 */
+  found: { page: string; title: string; to: boolean }[] = [];
+  private last: Node[] = [];
+  private versions = new Map<string, string>();
 
   constructor(private sh: Shell, private say: Say = () => {}) {}
 
@@ -128,6 +159,23 @@ export class Ui {
     this.say(text);
   }
 
+  /** 记下最近一次读到的屏幕，写进诊断文件。 */
+  async snap(note: string) {
+    if (this.snaps.length >= MAX_SNAPS) return;
+    let focus = "";
+    try {
+      focus = await this.focus();
+    } catch {
+      /* 读不到前台应用也照样记屏幕 */
+    }
+    const pkg = focus.split("/", 1)[0];
+    if (pkg && !this.versions.has(pkg)) {
+      const { out } = await this.sh.run(`dumpsys package ${pkg} | grep -m1 versionName`);
+      this.versions.set(pkg, /versionName=(\S+)/.exec(out)?.[1] ?? "");
+    }
+    this.snaps.push({ note, focus, appVersion: this.versions.get(pkg) || undefined, screen: screenLines(this.last) });
+  }
+
   // ---------- 读屏 ----------
 
   async tree(): Promise<Node[]> {
@@ -140,6 +188,7 @@ export class Ui {
         const root = nodes.find((n) => !n.parent);
         // 横屏时 dump 的根节点比竖屏宽。
         if (root && root.b[2] > 0 && root.b[3] > 0) [this.W, this.H] = [root.b[2], root.b[3]];
+        this.last = nodes;
         return nodes;
       }
       await this.sleep(500); // 页面在动画中时 dump 会失败
@@ -343,6 +392,7 @@ export class Ui {
 
   /** 开关后弹出确认框就点确认。只认 Button，不点开关旁边的「关闭」状态字。 */
   async confirm(): Promise<string | null> {
+    if (this.dryRun) return null; // 只检查模式下没有点过开关，不会有确认框，别误点页面上的「关闭」按钮
     await this.sleep(300);
     const nodes = await this.tree();
     for (const c of CONFIRM) {
@@ -376,6 +426,7 @@ export class Ui {
       }
       this.miss++;
       this.say(`没找到「${text}」`);
+      await this.snap(`没找到「${text}」`);
       return false;
     }
     for (let round = 0; round < 2; round++) {
@@ -397,14 +448,32 @@ export class Ui {
     }
     this.miss++;
     this.say(`没找到「${text}」`);
+    await this.snap(`没找到「${text}」`);
     return false;
+  }
+
+  /** 点一个会改设置的选项（「简洁」「不显示」「全部关闭」等）。只检查模式下只看有没有，不点。 */
+  async choose(text: string, opts: { exact?: boolean } = {}): Promise<boolean> {
+    if (!this.dryRun) {
+      const ok = await this.tap(text, { exact: opts.exact, scrolls: 0 });
+      this.miss = 0;
+      return ok;
+    }
+    const ok = !!this.find(await this.tree(), text, opts.exact ?? true, "tab");
+    this.say(ok ? `会选「${text}」` : `没找到「${text}」`);
+    if (ok) this.found.push({ page: "", title: `选「${text}」`, to: true });
+    else await this.snap(`没找到「${text}」`);
+    return ok;
   }
 
   /** 可选入口：有就点，没有也不算走丢。 */
   async maybe(text: string, scrolls = 6): Promise<boolean> {
     this.miss = 0;
+    const n = this.snaps.length;
     const ok = await this.tap(text, { exact: true, scrolls });
     this.miss = 0;
+    // 可选入口本来就可能没有，记下屏幕但不算出问题。
+    if (!ok && this.snaps.length > n) this.snaps[this.snaps.length - 1].note = `可选入口没有「${text}」`;
     return ok;
   }
 
@@ -424,6 +493,7 @@ export class Ui {
       }
     }
     this.say(`点「${text}」后没出现「${expect}」`);
+    await this.snap(`点「${text}」后没出现「${expect}」`);
     return false;
   }
 
@@ -452,6 +522,18 @@ export class Ui {
         checked++;
         if (sw.checked === want || sw.y < this.H * 0.08 || sw.y > this.H * 0.985) continue;
         targets.push({ ...sw, want });
+      }
+      if (this.dryRun) {
+        for (const t of targets) {
+          // 开关没被点，翻页后重叠的那几行会再出现一次。
+          if (this.found.some((f) => f.page === page && f.title === t.title)) continue;
+          this.say(`${t.want ? "会打开" : "会关掉"}：${page ? page + " · " : ""}${t.title}`);
+          this.found.push({ page, title: t.title, to: t.want });
+        }
+        if (s === 0) await this.snap(`检查：${page || "（未命名页面）"}`);
+        if (!(await this.scrollMore(nodes))) break;
+        nodes = await this.tree();
+        continue;
       }
       for (const [i, t] of targets.entries()) {
         await this.click(t.x, t.y);
@@ -484,7 +566,10 @@ export class Ui {
           still = await wrong();
         }
         for (const t of targets) {
-          if (still.some((x) => x.t === t)) this.say(`${t.want ? "打不开" : "关不掉"}：${t.title}`);
+          if (still.some((x) => x.t === t)) {
+            this.say(`${t.want ? "打不开" : "关不掉"}：${t.title}`);
+            await this.snap(`${t.want ? "打不开" : "关不掉"}：${t.title}`);
+          }
           else {
             this.say(`${t.want ? "已打开（保护类开关）" : "已关闭"}：${page ? page + " · " : ""}${t.title}`);
             this.changed.push({ page, title: t.title, to: t.want });
@@ -495,7 +580,10 @@ export class Ui {
       if (!(await this.scrollMore(nodes))) break;
       nodes = await this.tree();
     }
-    if (page && !checked) this.say(`${page}：没找到要改的开关`);
+    if (page && !checked) {
+      this.say(`${page}：没找到要改的开关`);
+      await this.snap(`${page}：没找到要改的开关`);
+    }
     return done;
   }
 

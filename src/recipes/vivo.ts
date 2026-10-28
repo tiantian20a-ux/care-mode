@@ -67,7 +67,7 @@ export const vivo: Record<string, (ui: Ui) => Promise<void>> = {
     await ui.go("我的", "设置");
     await ui.gear();
     if (await ui.maybe("首页设置")) {
-      await ui.maybe("极简首页", 0);
+      await ui.choose("极简首页");
       await ui.off({ only: ["首页上滑展示资讯"], page: "浏览器 · 首页设置" });
       await ui.back();
     }

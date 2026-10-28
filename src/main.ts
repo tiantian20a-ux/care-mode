@@ -19,6 +19,9 @@ import {
   restoreBackup,
   skipReason,
   validateBackup,
+  inspect,
+  type ExecDiag,
+  type InspectResult,
   type Log,
   type Outcome,
   type PlannedRule,
@@ -26,6 +29,7 @@ import {
 } from "./engine";
 import { FakePhone, demoState } from "./fake-phone";
 import { brandPhone } from "./fake-brands";
+import { buildDiagnostics, readRom, type Diagnostics } from "./diag";
 
 const common = commonJson as unknown as Pack;
 const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
@@ -52,23 +56,29 @@ function on(id: string, fn: () => void) {
   document.getElementById(id)?.addEventListener("click", fn);
 }
 
-function logView(): { log: Log; el: HTMLElement } {
+function logView(): { log: Log; el: HTMLElement; lines: { level: string; text: string }[] } {
   const el = document.createElement("ul");
   el.className = "log";
+  const lines: { level: string; text: string }[] = [];
   const log: Log = (level, text) => {
+    lines.push({ level, text });
     const li = document.createElement("li");
     li.className = level;
     li.textContent = text;
     el.appendChild(li);
     el.scrollTop = el.scrollHeight;
   };
-  return { log, el };
+  return { log, el, lines };
 }
 
 function download(backup: Backup) {
+  saveJson(backup, "backup", backup.device, backup.createdAt);
+}
+
+function saveJson(data: unknown, kind: string, device: { brand: string; model: string }, createdAt: string) {
   // 文件名只用英文和数字，避免部分浏览器把中文文件名下载成 "download"。
-  const name = `care-mode-backup-${backup.device.brand}-${backup.device.model}-${backup.createdAt.slice(0, 10)}`.replace(/[^\w.-]+/g, "_") + ".json";
-  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+  const name = `care-mode-${kind}-${device.brand}-${device.model}-${createdAt.slice(0, 10)}`.replace(/[^\w.-]+/g, "_") + ".json";
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   document.body.appendChild(a);
   a.click();
@@ -225,23 +235,25 @@ function review(pf: PreflightResult) {
       ${brand ? `<h2>${esc(brand.title)}</h2>
       ${brand.credits ? `<p class="muted">${esc(brand.credits)}</p>` : ""}
       <div class="card">${orderedRules(pack).filter((r) => r.group).map((r) => ruleRow(r, pf)).join("")}</div>`
-        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO、OPPO / 一加 / realme、vivo / iQOO、荣耀。</div>`}
+        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO、OPPO / 一加 / realme、vivo / iQOO、荣耀，华为和三星（未经真机验证）。</div>`}
       <h2>收尾</h2>
       <div class="card">${orderedRules(pack).filter((r) => r.runLast).map((r) => ruleRow(r, pf)).join("")}</div>
       <div class="note info">下一步会先读取手机当前的设置，生成备份文件下载到电脑。<b>请保存好这个文件</b>，以后还原要用。</div>
-      <div class="btns"><button class="primary" id="go">备份并继续</button><button id="back">返回</button></div>
+      <div class="btns"><button class="primary" id="go">备份并继续</button><button id="inspect">只检查，不改设置</button><button id="back">返回</button></div>
+      <p class="muted">「只检查」会照常打开各个设置页、找到要改的开关，但一个都不点，最后生成诊断文件。适合先在新机型上试一下。</p>
       <p id="status" class="muted"></p>`}
   `);
   on("back", home);
   on("go", () => startBackup(pf));
+  on("inspect", () => startInspect(pf));
 }
 
-function collectSelections() {
+function collectSelections(requireConsent = true) {
   const sel: { id: string; params: Record<string, string> }[] = [];
   for (const box of app.querySelectorAll<HTMLInputElement>("input[data-id]")) {
     if (!box.checked || box.disabled) continue;
     const rule = pack.rules.find((r) => r.id === box.dataset.id)!;
-    if (rule.tier === "consent" && !app.querySelector<HTMLInputElement>(`input[data-consent="${rule.id}"]`)?.checked) {
+    if (requireConsent && rule.tier === "consent" && !app.querySelector<HTMLInputElement>(`input[data-consent="${rule.id}"]`)?.checked) {
       throw new Error(`「${rule.title}」需要机主同意。请勾选下面的确认框，或者取消这一项。`);
     }
     const params = defaultParams(rule);
@@ -249,6 +261,56 @@ function collectSelections() {
     sel.push({ id: rule.id, params });
   }
   return sel;
+}
+
+// ---------- 只检查 ----------
+
+async function startInspect(pf: PreflightResult) {
+  const status = document.getElementById("status")!;
+  const selections = collectSelections(false);
+  if (!selections.length) {
+    status.textContent = "还没有选任何一项。";
+    return;
+  }
+  status.textContent = "正在读取手机当前设置……";
+  let plan: PlannedRule[];
+  try {
+    plan = (await prepare(shell!, pack, pf.device, selections, () => {})).plan;
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--bad)">读取失败：${esc((e as Error).message)}</span>`;
+    return;
+  }
+  render(`<h1>正在检查，不会改任何设置</h1><p class="muted">手机屏幕会自己翻页，这是工具在找开关，请不要碰它。</p><div class="card" id="logbox"></div>`);
+  const { log, el, lines } = logView();
+  document.getElementById("logbox")!.appendChild(el);
+  const rom = await readRom(shell!).catch(() => ({}));
+  const diag: ExecDiag = { snaps: [] };
+  let result: Record<string, InspectResult> = {};
+  try {
+    result = await inspect(shell!, plan, log, diag);
+  } catch (e) {
+    log("error", `意外中断：${(e as Error).message}`);
+  }
+  const createdAt = new Date().toISOString();
+  const report = buildDiagnostics(pf.device, rom, result, lines, diag, "inspect");
+  render(`
+    <h1>检查完成，没有改动手机</h1>
+    <div class="card"><ul class="result-list">${plan
+      .map((p) => {
+        const r = result[p.rule.id];
+        if (!r) return `<li>－ 没检查到　${esc(p.rule.title)}</li>`;
+        return `<li>${r.problems ? "!" : "✓"}　${esc(p.rule.title)}：会改 ${r.changes} 项${r.problems ? `，${r.problems} 处没找到` : ""}</li>`;
+      })
+      .join("")}</ul></div>
+    <div class="note info">请<button class="link" id="diag">下载诊断文件</button>发给开发者，用来核对这台手机的设置入口。文件里有检查时屏幕上的文字，可能包含账号昵称，发之前可以打开看一眼。</div>
+    <div class="note warn">USB 调试还开着。检查完如果不打算马上设置，记得到「开发者选项」里关掉它。</div>
+    <details class="card"><summary>查看详细记录</summary><div id="logbox"></div></details>
+    <div class="btns"><button class="primary" id="again">现在正式设置</button><button id="home">回到首页</button></div>
+  `);
+  document.getElementById("logbox")!.appendChild(el);
+  on("diag", () => saveJson(report, "diagnostics", pf.device, createdAt));
+  on("again", () => review(pf));
+  on("home", home);
 }
 
 // ---------- 备份 ----------
@@ -307,23 +369,28 @@ function confirmBackup(backup: Backup, plan: PlannedRule[]) {
 async function run(plan: PlannedRule[], backup: Backup) {
   const uiCount = plan.filter((p) => p.rule.executor === "ui").length;
   render(`<h1>正在设置，请不要拔线</h1><p class="muted" id="status">大约需要 ${uiCount > 2 ? "5 到 15" : "1 到 3"} 分钟。手机屏幕会自己动，这是工具在点设置，请不要碰它。</p><div class="card" id="logbox"></div>`);
-  const { log, el } = logView();
+  const { log, el, lines } = logView();
   document.getElementById("logbox")!.appendChild(el);
-  let result: Record<string, Outcome>;
+  // 最后一步会关掉 USB 调试，所以系统版本号要在执行前读。
+  const rom = await readRom(shell!).catch(() => ({}));
+  const diag: ExecDiag = { snaps: [] };
+  const result: Record<string, Outcome> = {};
+  const report = () => buildDiagnostics(backup.device, rom, result, lines, diag, "run");
   try {
-    result = await execute(shell!, plan, log);
+    Object.assign(result, await execute(shell!, plan, log, diag));
   } catch (e) {
     log("error", `意外中断：${(e as Error).message}`);
-    document.getElementById("status")!.innerHTML = `出错了。已经改了的设置可以用备份文件还原。<button class="link" id="home">回到首页</button>`;
+    document.getElementById("status")!.innerHTML = `出错了。已经改了的设置可以用备份文件还原。<button class="link" id="diag">下载诊断文件</button> <button class="link" id="home">回到首页</button>`;
+    on("diag", () => saveJson(report(), "diagnostics", backup.device, backup.createdAt));
     on("home", home);
     return;
   }
   // 界面配方改了哪些应用内开关，执行后才知道，已经补进备份的还原清单里。
   rememberBackup(backup);
-  done(plan, result, el, backup);
+  done(plan, result, el, backup, report());
 }
 
-function done(plan: PlannedRule[], result: Record<string, Outcome>, logEl: HTMLElement, backup: Backup) {
+function done(plan: PlannedRule[], result: Record<string, Outcome>, logEl: HTMLElement, backup: Backup, report: Diagnostics) {
   const manual = backup.rules.flatMap((r) => r.restore).filter((o) => o.op === "manual");
   const label: Record<Outcome, string> = { ok: "✓ 完成", partial: "! 部分完成", rolled_back: "↺ 已自动改回", failed: "✗ 没做成，已改回" };
   render(`
@@ -336,10 +403,12 @@ function done(plan: PlannedRule[], result: Record<string, Outcome>, logEl: HTMLE
       <details><summary>查看改了哪些开关，以及以后怎么手动还原</summary><ul>${manual.map((o) => `<li>${esc(o.op === "manual" ? o.text : "")}</li>`).join("")}</ul></details>
     </div>` : ""}
     <details class="card"><summary>查看详细记录</summary><div id="logbox"></div></details>
+    ${report.snaps.length ? `<div class="note info">有 ${report.snaps.length} 处没找到入口或开关，已经跳过。可以<button class="link" id="diag">下载诊断文件</button>发给开发者，用来适配这台手机。文件里有当时屏幕上的文字，可能包含账号昵称，发之前可以打开看一眼。</div>` : ""}
     <div class="btns"><button id="home">回到首页</button></div>
   `);
   document.getElementById("logbox")!.appendChild(logEl);
   on("dl-full", () => download(backup));
+  on("diag", () => saveJson(report, "diagnostics", backup.device, backup.createdAt));
   on("home", home);
 }
 

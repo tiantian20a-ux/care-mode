@@ -45,7 +45,7 @@ export const oppo: Record<string, (ui: Ui) => Promise<void>> = {
     // 不关「推荐服务」总开关：会连天气、步数、清理卡片一起删掉。只把轮播推荐设成不显示。
     if (await ui.maybe("推荐服务")) {
       if (await ui.maybe("轮播推荐")) {
-        await ui.tap("不显示", { scrolls: 0 });
+        await ui.choose("不显示");
         await ui.back();
       }
       await ui.back();
@@ -111,7 +111,7 @@ export const oppo: Record<string, (ui: Ui) => Promise<void>> = {
     }
     if (await ui.maybe("主页设置")) {
       if (await ui.maybe("页面布局")) {
-        await ui.tap("简洁", { scrolls: 0 });
+        await ui.choose("简洁");
         await ui.back();
       }
       await ui.back();

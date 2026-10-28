@@ -163,6 +163,9 @@ export class FakePhone implements Shell {
     if ((m = /^pm list packages ([\w.]+)$/.exec(cmd))) {
       return ok(s.packages.filter((p) => p.includes(m![1])).map((p) => `package:${p}\n`).join(""));
     }
+    if ((m = /^dumpsys package ([\w.]+) \| grep -m1 versionName$/.exec(cmd))) {
+      return ok(s.packages.includes(m[1]) ? "    versionName=1.0.0-demo\n" : "");
+    }
     if ((m = /^dumpsys package ([\w.]+)$/.exec(cmd))) {
       if (!s.packages.includes(m[1])) return ok(`Unable to find package: ${m[1]}\n`);
       return ok(`Packages:\n  Package [${m[1]}]\n    User 0: ceDataInode=1 installed=true hidden=false suspended=${s.suspended.includes(m[1])} stopped=false\n`);

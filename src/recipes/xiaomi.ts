@@ -44,7 +44,7 @@ export const xiaomi: Record<string, (ui: Ui) => Promise<void>> = {
     }
     if (await ui.maybe("模式切换")) {
       // 新版商店没有这一项
-      await ui.tap("极简模式", { scrolls: 0 });
+      await ui.choose("极简模式");
       await ui.confirm();
       await ui.back();
     }

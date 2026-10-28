@@ -3,7 +3,7 @@
 
 import type { Action, Backup, DeviceInfo, Pack, RestoreOp, Rule, Shell } from "./types";
 import { listChannels, setChannelEnabled, type Channel } from "./channels";
-import { Ui, UiError } from "./ui";
+import { Ui, UiError, type Snap } from "./ui";
 import { RECIPES } from "./recipes";
 import { shQuote } from "./util";
 
@@ -259,7 +259,12 @@ export async function prepare(sh: Shell, pack: Pack, device: DeviceInfo, selecti
 
 export type Outcome = "ok" | "partial" | "rolled_back" | "failed";
 
-export async function execute(sh: Shell, plan: PlannedRule[], log: Log): Promise<Record<string, Outcome>> {
+/** 执行过程中收集的诊断信息：每段界面配方出问题时的屏幕。 */
+export interface ExecDiag {
+  snaps: (Snap & { rule: string })[];
+}
+
+export async function execute(sh: Shell, plan: PlannedRule[], log: Log, diag?: ExecDiag): Promise<Record<string, Outcome>> {
   const result: Record<string, Outcome> = {};
   let ui: Ui | undefined;
   for (const p of plan) {
@@ -278,15 +283,18 @@ export async function execute(sh: Shell, plan: PlannedRule[], log: Log): Promise
             continue;
           }
           const before = ui.changed.length;
+          const snapsBefore = ui.snaps.length;
           try {
             await RECIPES[s.recipe][s.segment](ui);
           } catch (e) {
             if (!(e instanceof UiError) && !(e instanceof Error)) throw e;
             failures++;
             log("warn", (e as Error).message);
+            await ui.snap(`出错：${(e as Error).message}`);
           } finally {
             await sh.run("input keyevent KEYCODE_HOME");
           }
+          diag?.snaps.push(...ui.snaps.slice(snapsBefore).map((x) => ({ ...x, rule: p.rule.id })));
           for (const c of ui.changed.slice(before)) {
             p.restore.push({ op: "manual", text: `${c.page ? c.page + "：" : ""}把「${c.title}」${c.to ? "关掉" : "重新打开"}` });
           }
@@ -424,4 +432,67 @@ export async function restoreBackup(sh: Shell, backup: Backup, log: Log): Promis
     failures += await runRestore(sh, r.restore, log);
   }
   return failures;
+}
+
+// ---------- 只检查 ----------
+
+export interface InspectResult {
+  /** 本来会改的项数（开关、命令、通知类别）。 */
+  changes: number;
+  /** 没找到入口或开关的次数。 */
+  problems: number;
+}
+
+/** 只检查、不改设置：界面配方照常打开页面找开关但不点，其他规则只列出会执行什么。 */
+export async function inspect(sh: Shell, plan: PlannedRule[], log: Log, diag: ExecDiag): Promise<Record<string, InspectResult>> {
+  const out: Record<string, InspectResult> = {};
+  let ui: Ui | undefined;
+  for (const p of plan) {
+    log("info", `正在检查：${p.rule.title}`);
+    const r: InspectResult = { changes: 0, problems: 0 };
+    for (const s of p.steps) {
+      if (s.kind === "cmd") {
+        r.changes++;
+        log("info", `会执行：${s.cmd}`);
+      } else if (s.kind === "channel_off") {
+        r.changes++;
+        log("info", `会关通知：${s.ch.pkg} · ${s.ch.name}`);
+      } else {
+        if (!ui) {
+          ui = new Ui(sh, (t) => log("info", t));
+          ui.dryRun = true;
+          try {
+            await ui.init();
+          } catch (e) {
+            log("warn", (e as Error).message);
+            r.problems++;
+            ui = undefined;
+            continue;
+          }
+        }
+        if (await ui.locked()) {
+          r.problems++;
+          log("warn", "手机锁屏了，这一项跳过。请解锁手机并保持亮屏。");
+          continue;
+        }
+        const found = ui.found.length;
+        const snaps = ui.snaps.length;
+        try {
+          await RECIPES[s.recipe][s.segment](ui);
+        } catch (e) {
+          log("warn", (e as Error).message);
+          await ui.snap(`出错：${(e as Error).message}`);
+        } finally {
+          await sh.run("input keyevent KEYCODE_HOME");
+        }
+        r.changes += ui.found.length - found;
+        const fresh = ui.snaps.slice(snaps);
+        r.problems += fresh.filter((x) => !x.note.startsWith("检查：") && !x.note.startsWith("可选入口")).length;
+        diag.snaps.push(...fresh.map((x) => ({ ...x, rule: p.rule.id })));
+      }
+    }
+    out[p.rule.id] = r;
+    log(r.problems ? "warn" : "ok", `${p.rule.title}：会改 ${r.changes} 项${r.problems ? `，有 ${r.problems} 处没找到` : ""}`);
+  }
+  return out;
 }
