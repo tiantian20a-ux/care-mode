@@ -1,0 +1,65 @@
+{
+  "pack": "samsung",
+  "title": "三星专属（未经真机验证）",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "samsung"
+    ],
+    "manufacturer": [
+      "samsung"
+    ]
+  },
+  "credits": "android-ad-cleaner 没有三星的实测清单，这几项按公开教程（One UI 5 前后）整理，还没在真机上试过，所以默认不勾。三星应用的推广通知由通用的「关闭营销类通知」处理。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "samsung-ui-customization",
+      "title": "系统：关定制广告和直接营销",
+      "why": "设置 → 隐私 → 定制服务。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "samsung",
+          "segment": "定制服务"
+        }
+      ]
+    },
+    {
+      "id": "samsung-ui-account",
+      "title": "三星账户：关优惠资讯和个性化广告",
+      "why": "设置 → 三星账户 → 安全与隐私。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "samsung",
+          "segment": "三星账户"
+        }
+      ]
+    },
+    {
+      "id": "samsung-ui-store",
+      "title": "Galaxy Store：关定制服务",
+      "why": "Galaxy Store → 菜单 → 设置 → 定制服务。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "samsung",
+          "segment": "应用商店"
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import oppoJson from "../rules/oppo.json";
 import vivoJson from "../rules/vivo.json";
 import honorJson from "../rules/honor.json";
 import xiaomiJson from "../rules/xiaomi.json";
+import huaweiJson from "../rules/huawei.json";
+import samsungJson from "../rules/samsung.json";
 import type { Pack } from "../src/types";
 import { FakePhone } from "../src/fake-phone";
 import { switchStates } from "../src/fake-ui";
@@ -11,10 +13,10 @@ import { brandPhone } from "../src/fake-brands";
 import { brandPackFor, execute, mergePacks, preflight, prepare, restoreBackup, validateBackup, type Log } from "../src/engine";
 
 const common = commonJson as unknown as Pack;
-const packs = [xiaomiJson, oppoJson, vivoJson, honorJson] as unknown as Pack[];
+const packs = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
 const quiet: Log = () => {};
 
-async function run(brand: "oppo" | "vivo" | "honor", only?: (id: string) => boolean) {
+async function run(brand: Parameters<typeof brandPhone>[0], only?: (id: string) => boolean) {
   const { state, ui } = brandPhone(brand);
   const phone = new FakePhone(state, 0, ui);
   const pf = await preflight(phone, common);
@@ -45,9 +47,13 @@ describe("品牌识别", () => {
   ])("%s 用 %s 包", (brand, pack) => {
     expect(brandPackFor(dev(brand), packs)?.pack).toBe(pack);
   });
-  it("华为、三星暂时没有品牌包", () => {
-    expect(brandPackFor(dev("HUAWEI"), packs)).toBeUndefined();
-    expect(brandPackFor(dev("samsung"), packs)).toBeUndefined();
+  it("华为、三星有包，其他品牌只用通用设置", () => {
+    expect(brandPackFor(dev("HUAWEI"), packs)?.pack).toBe("huawei");
+    expect(brandPackFor(dev("samsung"), packs)?.pack).toBe("samsung");
+    expect(brandPackFor(dev("motorola"), packs)).toBeUndefined();
+  });
+  it("没验证过的华为、三星规则默认不勾", () => {
+    for (const p of packs.filter((p) => p.pack === "huawei" || p.pack === "samsung")) for (const r of p.rules) expect(r.tier).toBe("optional");
   });
 });
 
@@ -219,5 +225,41 @@ describe("荣耀", () => {
     const result = await execute(phone, plan, quiet);
     expect(result["honor-ui-themes"]).toBe("ok");
     expect(switchStates(ui)["bRec·个性化内容"]).toBe(true);
+  });
+});
+
+describe("华为（模拟界面按公开教程搭，只测代码路径）", () => {
+  it("打开限制广告追踪，关推荐和广告", async () => {
+    const { st, result, logs } = await run("huawei");
+    expect(Object.values(result).every((r) => r === "ok"), logs.join("\n")).toBe(true);
+    expect(st["adpriv·限制广告追踪"]).toBe(true);
+    expectStates(
+      st,
+      ["adMore·智能推荐服务", "search·实时热点", "searchAdv·个性化推荐", "searchAdv·个性化广告", "todaySettings·个性化广告", "todaySettings·华为广告", "todaySettings·三方广告", "bMsg·资讯通知", "bPriv·个性化内容", "bAds·个性化广告", "bAds·摇一摇广告", "bAds·开屏广告"],
+      ["search·搜索历史", "todaySettings·航班提醒", "bMsg·下载完成通知", "bPriv·保存密码"],
+    );
+  });
+});
+
+describe("三星（模拟界面按公开教程搭，只测代码路径）", () => {
+  it("关定制广告、账户优惠和商店定制服务", async () => {
+    const { st, result, logs } = await run("samsung");
+    expect(Object.values(result).every((r) => r === "ok"), logs.join("\n")).toBe(true);
+    expectStates(
+      st,
+      ["custom·定制广告和直接营销", "acctPriv·获取新闻和特别优惠", "acctPriv·使用三星账户数据改进个性化广告", "storeCustom·定制服务"],
+      ["custom·使用情况分析", "acctPriv·两步验证", "storeSettings·自动更新应用"],
+    );
+  });
+
+  it("英文界面找不到中文入口时跳过，不乱点", async () => {
+    const { state, ui } = brandPhone("samsung");
+    ui.pages.settings.items = [{ text: "Connections", to: "none" }];
+    const phone = new FakePhone(state, 0, ui);
+    const pf = await preflight(phone, common);
+    const pack = mergePacks(common, brandPackFor(pf.device, packs));
+    const { plan } = await prepare(phone, pack, pf.device, [{ id: "samsung-ui-customization", params: {} }], quiet);
+    await execute(phone, plan, quiet);
+    expect(switchStates(ui)["custom·定制广告和直接营销"]).toBe(true);
   });
 });

@@ -265,7 +265,11 @@
             "资讯",
             "福利",
             "红包",
-            "促销"
+            "促销",
+            "Promotion",
+            "promotion",
+            "Marketing",
+            "marketing"
           ],
           "neverMatch": [
             "验证码",

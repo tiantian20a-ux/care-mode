@@ -200,10 +200,59 @@ export function fakeHonorApps(): FakeUi {
   );
 }
 
+// 华为和三星没有实测清单，下面的界面是按公开教程猜的，只用来测代码路径。
+export function fakeHuaweiApps(): FakeUi {
+  const S = "com.android.settings";
+  return build(
+    {
+      settings: { pkg: S, act: ".HWSettings", title: "设置", items: [l("WLAN", "none"), l("智慧助手", "assist"), l("隐私", "priv")] },
+      priv: { pkg: S, act: ".Priv", title: "隐私", items: [l("权限管理", "none"), l("广告与隐私", "adpriv")] },
+      adpriv: { pkg: S, act: ".AdPriv", title: "广告与隐私", items: [s("限制广告追踪", false), l("更多信息", "adMore")] },
+      adMore: { pkg: S, act: ".AdMore", title: "更多信息", items: [s("智能推荐服务")] },
+      assist: { pkg: S, act: ".Assist", title: "智慧助手", items: [l("智慧搜索", "search"), l("今天", "today")] },
+      search: { pkg: S, act: ".Search", title: "智慧搜索", items: [s("实时热点"), s("搜索历史"), l("高级设置", "searchAdv")] },
+      searchAdv: { pkg: S, act: ".SearchAdv", title: "高级设置", items: [s("个性化推荐"), s("个性化广告")] },
+      today: { pkg: S, act: ".Today", title: "今天", items: [l("设置", "todaySettings")] },
+      todaySettings: { pkg: S, act: ".TodaySettings", title: "今天设置", items: [s("个性化广告"), s("华为广告"), s("三方广告"), s("航班提醒")] },
+
+      browser: { pkg: "com.huawei.browser", act: ".Main", title: "浏览器", items: [l("今日热点", "none"), tab("首页"), tab("我的", "bMine")] },
+      bMine: { pkg: "com.huawei.browser", act: ".Mine", title: "我的", items: [l("设置", "bSettings")] },
+      bSettings: { pkg: "com.huawei.browser", act: ".Settings", title: "浏览器设置", items: [l("消息通知", "bMsg"), l("安全与隐私", "bPriv"), l("个性化广告", "bAds")] },
+      bMsg: { pkg: "com.huawei.browser", act: ".Msg", title: "消息通知", items: [s("资讯通知"), s("下载完成通知")] },
+      bPriv: { pkg: "com.huawei.browser", act: ".Priv", title: "安全与隐私", items: [s("个性化内容"), s("保存密码")] },
+      bAds: { pkg: "com.huawei.browser", act: ".Ads", title: "个性化广告", items: [s("个性化广告"), s("摇一摇广告"), s("开屏广告")] },
+    },
+    { "com.huawei.browser": "browser" },
+    {},
+  );
+}
+
+export function fakeSamsungApps(): FakeUi {
+  const S = "com.android.settings";
+  return build(
+    {
+      settings: { pkg: S, act: ".SecSettings", title: "设置", items: [l("三星账户", "acct"), l("连接", "none"), l("隐私", "priv")] },
+      priv: { pkg: S, act: ".Priv", title: "隐私", items: [l("权限管理器", "none"), l("定制服务", "custom")] },
+      custom: { pkg: S, act: ".Custom", title: "定制服务", items: [s("定制广告和直接营销"), s("使用情况分析")] },
+      acct: { pkg: S, act: ".Acct", title: "三星账户", items: [l("安全与隐私", "acctPriv")] },
+      acctPriv: { pkg: S, act: ".AcctPriv", title: "安全与隐私", items: [s("获取新闻和特别优惠"), s("使用三星账户数据改进个性化广告"), s("两步验证")] },
+
+      store: { pkg: "com.sec.android.app.samsungapps", act: ".Main", title: "Galaxy Store", popup: true, items: [l("推荐", "none"), tab("菜单", "storeMenu")] },
+      storeMenu: { pkg: "com.sec.android.app.samsungapps", act: ".Menu", title: "菜单", gear: "storeSettings", items: [l("我的应用", "none")] },
+      storeSettings: { pkg: "com.sec.android.app.samsungapps", act: ".Settings", title: "Galaxy Store 设置", items: [s("自动更新应用"), l("定制服务", "storeCustom")] },
+      storeCustom: { pkg: "com.sec.android.app.samsungapps", act: ".Custom", title: "定制服务", items: [s("定制服务")] },
+    },
+    { "com.sec.android.app.samsungapps": "store" },
+    {},
+  );
+}
+
 const BRANDS = {
   oppo: { props: ["OPPO", "OPPO", "PJA110（演示）"], apps: fakeOppoApps, extra: ["com.opos.ads", "com.heytap.pictorial", "com.nearme.instant.platform"] },
   vivo: { props: ["vivo", "vivo", "V2547A（演示）"], apps: fakeVivoApps, extra: ["com.vivo.hybrid"] },
   honor: { props: ["HONOR", "HONOR", "PNM-AN10（演示）"], apps: fakeHonorApps, extra: ["com.hihonor.quickengine"] },
+  huawei: { props: ["HUAWEI", "HUAWEI", "NOH-AN00（演示）"], apps: fakeHuaweiApps, extra: ["com.huawei.fastapp"] },
+  samsung: { props: ["samsung", "samsung", "SM-S9180（演示）"], apps: fakeSamsungApps, extra: [] },
 } as const;
 
 /** 某个品牌的模拟手机：装着这个品牌的应用，界面按清单搭好。 */

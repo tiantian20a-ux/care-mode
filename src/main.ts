@@ -4,6 +4,8 @@ import xiaomiJson from "../rules/xiaomi.json";
 import oppoJson from "../rules/oppo.json";
 import vivoJson from "../rules/vivo.json";
 import honorJson from "../rules/honor.json";
+import huaweiJson from "../rules/huawei.json";
+import samsungJson from "../rules/samsung.json";
 import type { Backup, Pack, Rule, Shell } from "./types";
 import {
   brandPackFor,
@@ -26,7 +28,7 @@ import { FakePhone, demoState } from "./fake-phone";
 import { brandPhone } from "./fake-brands";
 
 const common = commonJson as unknown as Pack;
-const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson] as unknown as Pack[];
+const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
 /** 连上手机后换成「通用 + 这个品牌」合并后的规则包。 */
 let pack: Pack = common;
 let brand: Pack | undefined;
@@ -36,7 +38,7 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 let shell: Shell | undefined;
 let demo = false;
-/** 演示用哪个品牌的模拟手机：?demo=oppo / vivo / honor，默认小米。 */
+/** 演示用哪个品牌的模拟手机：?demo=oppo / vivo / honor / huawei / samsung，默认小米。 */
 let demoBrand = "";
 
 // ---------- 小工具 ----------
@@ -93,8 +95,8 @@ function lastBackup(): Backup | undefined {
 
 async function getShell(onAuth: () => void): Promise<Shell | undefined> {
   if (demo) {
-    if (demoBrand === "oppo" || demoBrand === "vivo" || demoBrand === "honor") {
-      const { state, ui } = brandPhone(demoBrand);
+    if (["oppo", "vivo", "honor", "huawei", "samsung"].includes(demoBrand)) {
+      const { state, ui } = brandPhone(demoBrand as Parameters<typeof brandPhone>[0]);
       return new FakePhone(state, 30, ui);
     }
     return new FakePhone(demoState(), 30);

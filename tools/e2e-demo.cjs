@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
   await p.waitForSelector('#go', { timeout: 20000 });
   await p.screenshot({ path: S + '/2-review.png', fullPage: true });
   // consent missing → message
-  const brandRule = { '': 'xiaomi-msa', oppo: 'oppo-ad-packages', vivo: 'vivo-quickapp', honor: '' }[process.argv[3] || ''];
+  const brandRule = { '': 'xiaomi-msa', oppo: 'oppo-ad-packages', vivo: 'vivo-quickapp', honor: '', huawei: '', samsung: '' }[process.argv[3] || ''];
   await p.check('#r-quick-apps');
   if (brandRule) { await p.check('#r-' + brandRule); await p.check(`input[data-consent="${brandRule}"]`); }
   await p.click('#go');
@@ -32,7 +32,7 @@ const { chromium } = require('playwright');
   await p.check('#saved');
   await p.click('#run');
   await p.waitForSelector('text=设置完成', { timeout: 400000 });
-  await p.screenshot({ path: S + '/4-done.png', fullPage: true }); const dl2 = p.waitForEvent('download'); await p.click('#dl-full'); await (await dl2).saveAs(S + '/backup.json'); console.log('full backup saved');
+  await p.screenshot({ path: S + '/4-done.png', fullPage: true }); if (await p.$('#dl-full')) { const dl2 = p.waitForEvent('download'); await p.click('#dl-full'); await (await dl2).saveAs(S + '/backup.json'); console.log('full backup saved'); }
   console.log(await p.textContent('.result-list'));
   // restore flow
   await p.click('#home');

@@ -1,0 +1,65 @@
+{
+  "pack": "huawei",
+  "title": "华为专属（未经真机验证）",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "HUAWEI"
+    ],
+    "manufacturer": [
+      "HUAWEI"
+    ]
+  },
+  "credits": "android-ad-cleaner 没有华为的实测清单，这几项按公开教程整理，还没在真机上试过，所以默认不勾。适用于 EMUI 和 HarmonyOS 4 及以下；HarmonyOS NEXT 不是安卓，连不上。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "huawei-ui-adprivacy",
+      "title": "系统：打开限制广告追踪，关智能推荐",
+      "why": "设置 → 隐私 → 广告与隐私。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "huawei",
+          "segment": "广告与隐私"
+        }
+      ]
+    },
+    {
+      "id": "huawei-ui-assistant",
+      "title": "智慧助手：关热点、个性化推荐和广告",
+      "why": "设置 → 智慧助手 → 智慧搜索 / 今天。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "huawei",
+          "segment": "智慧助手"
+        }
+      ]
+    },
+    {
+      "id": "huawei-ui-browser",
+      "title": "浏览器：关资讯通知、个性化内容和广告",
+      "why": "华为浏览器 → 设置。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "huawei",
+          "segment": "浏览器"
+        }
+      ]
+    }
+  ]
+}
