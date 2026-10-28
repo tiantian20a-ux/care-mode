@@ -1,0 +1,125 @@
+{
+  "pack": "meizu",
+  "title": "魅族专属（未经真机验证）",
+  "version": "0.1.0",
+  "match": {
+    "brand": [
+      "Meizu"
+    ],
+    "manufacturer": [
+      "Meizu"
+    ]
+  },
+  "credits": "android-ad-cleaner 没有魅族的实测清单，这几项按 Flyme 8 时期的公开教程整理，新版可能不同，所以默认不勾。",
+  "appliesTo": {
+    "os": "android",
+    "minSdk": 26
+  },
+  "rules": [
+    {
+      "id": "meizu-ui-search",
+      "title": "全局搜索：关资讯头条和热词",
+      "why": "设置 → 辅助功能 → 全局搜索。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "全局搜索"
+        }
+      ]
+    },
+    {
+      "id": "meizu-ui-weather",
+      "title": "天气：关本地资讯、精选推送和开屏推荐",
+      "why": "天气 → 设置。气象预警保留。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "天气"
+        }
+      ]
+    },
+    {
+      "id": "meizu-ui-store",
+      "title": "应用商店：关精选内容推送",
+      "why": "应用商店 → 头像 → 设置。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "应用商店"
+        }
+      ]
+    },
+    {
+      "id": "meizu-ui-browser",
+      "title": "浏览器：关精选内容推送",
+      "why": "浏览器 → 设置。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "浏览器"
+        }
+      ]
+    },
+    {
+      "id": "meizu-ui-themes",
+      "title": "主题美化：关精选内容推送",
+      "why": "主题美化 → 头像 → 设置。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "主题美化"
+        }
+      ]
+    },
+    {
+      "id": "meizu-ui-safe",
+      "title": "手机管家：关应用推荐下载和安全播报卡片",
+      "why": "手机管家 → 设置 → 智能卡片。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "手机管家"
+        }
+      ]
+    },
+    {
+      "id": "meizu-ui-video",
+      "title": "视频：关开屏广告和推荐",
+      "why": "视频 → 我的 → 设置。",
+      "tier": "optional",
+      "executor": "ui",
+      "caution": "未经真机验证：路径按 Flyme 8 时期的公开教程整理，入口名对不上就会跳过。执行时请不要操作手机。应用里的开关需要手动还原，执行后会生成还原清单。",
+      "actions": [
+        {
+          "type": "ui_recipe",
+          "recipe": "meizu",
+          "segment": "视频"
+        }
+      ]
+    }
+  ]
+}

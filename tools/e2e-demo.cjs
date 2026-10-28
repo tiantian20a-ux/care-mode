@@ -16,7 +16,7 @@ const { chromium } = require('playwright');
   await p.waitForSelector('#go', { timeout: 20000 });
   await p.screenshot({ path: S + '/2-review.png', fullPage: true });
   // consent missing → message
-  const brandRule = { '': 'xiaomi-msa', oppo: 'oppo-ad-packages', vivo: 'vivo-quickapp', honor: '', huawei: '', samsung: '' }[process.argv[3] || ''];
+  const brandRule = { '': 'xiaomi-msa', oppo: 'oppo-ad-packages', vivo: 'vivo-quickapp', honor: '', huawei: '', samsung: '', meizu: '' }[process.argv[3] || ''];
   await p.check('#r-quick-apps');
   if (brandRule) { await p.check('#r-' + brandRule); await p.check(`input[data-consent="${brandRule}"]`); }
   await p.click('#go');

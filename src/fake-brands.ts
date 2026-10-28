@@ -247,12 +247,47 @@ export function fakeSamsungApps(): FakeUi {
   );
 }
 
+// 魅族同样没有实测清单，界面按 Flyme 8 时期的教程猜的。
+export function fakeMeizuApps(): FakeUi {
+  const S = "com.android.settings";
+  const app = (pkg: string, title: string, items: FakeItem[], viaAvatar = false): Record<string, FakePage> => {
+    const id = pkg.split(".").pop()!;
+    return viaAvatar
+      ? {
+          [id]: { pkg, act: ".Main", title, items: [l("头像", `${id}Me`), l("推荐", "none")] },
+          [`${id}Me`]: { pkg, act: ".Me", title: "我的", gear: `${id}Set`, items: [l("我的收藏", "none")] },
+          [`${id}Set`]: { pkg, act: ".Settings", title: "设置", items },
+        }
+      : {
+          [id]: { pkg, act: ".Main", title, gear: `${id}Set`, items: [l("首页", "none")] },
+          [`${id}Set`]: { pkg, act: ".Settings", title: "设置", items },
+        };
+  };
+  return build(
+    {
+      settings: { pkg: S, act: ".MzSettings", title: "设置", items: [l("显示和亮度", "none"), l("辅助功能", "acc")] },
+      acc: { pkg: S, act: ".Acc", title: "辅助功能", items: [l("全局搜索", "gs")] },
+      gs: { pkg: S, act: ".Gs", title: "全局搜索", items: [s("最近使用"), s("资讯头条"), s("天气插件显示热词"), s("精选内容推送")] },
+      ...app("com.meizu.flyme.weather", "天气", [s("本地资讯"), s("精选内容推送"), s("允许展示开屏推荐"), s("天气预警")]),
+      ...app("com.meizu.mstore", "应用商店", [s("精选内容推送"), s("自动更新应用")], true),
+      ...app("com.android.browser", "浏览器", [s("精选内容推送"), s("保存密码")]),
+      ...app("com.meizu.customizecenter", "主题美化", [s("精选内容推送"), s("节日壁纸", false)], true),
+      ...app("com.meizu.safe", "手机管家", [l("智能卡片", "safeCards"), s("自动清理")]),
+      safeCards: { pkg: "com.meizu.safe", act: ".Cards", title: "智能卡片", items: [s("安全播报"), s("应用推荐下载"), s("流量提醒")] },
+      ...app("com.meizu.media.video", "视频", [s("精选内容推送"), s("展示开屏广告"), s("本地播放器推荐在线内容")]),
+    },
+    { "com.meizu.flyme.weather": "weather", "com.meizu.mstore": "mstore", "com.android.browser": "browser", "com.meizu.customizecenter": "customizecenter", "com.meizu.safe": "safe", "com.meizu.media.video": "video" },
+    {},
+  );
+}
+
 const BRANDS = {
   oppo: { props: ["OPPO", "OPPO", "PJA110（演示）"], apps: fakeOppoApps, extra: ["com.opos.ads", "com.heytap.pictorial", "com.nearme.instant.platform"] },
   vivo: { props: ["vivo", "vivo", "V2547A（演示）"], apps: fakeVivoApps, extra: ["com.vivo.hybrid"] },
   honor: { props: ["HONOR", "HONOR", "PNM-AN10（演示）"], apps: fakeHonorApps, extra: ["com.hihonor.quickengine"] },
   huawei: { props: ["HUAWEI", "HUAWEI", "NOH-AN00（演示）"], apps: fakeHuaweiApps, extra: ["com.huawei.fastapp"] },
   samsung: { props: ["samsung", "samsung", "SM-S9180（演示）"], apps: fakeSamsungApps, extra: [] },
+  meizu: { props: ["Meizu", "Meizu", "MEIZU 21（演示）"], apps: fakeMeizuApps, extra: [] },
 } as const;
 
 /** 某个品牌的模拟手机：装着这个品牌的应用，界面按清单搭好。 */

@@ -6,6 +6,7 @@ import vivoJson from "../rules/vivo.json";
 import honorJson from "../rules/honor.json";
 import huaweiJson from "../rules/huawei.json";
 import samsungJson from "../rules/samsung.json";
+import meizuJson from "../rules/meizu.json";
 import type { Backup, Pack, Rule, Shell } from "./types";
 import {
   brandPackFor,
@@ -34,7 +35,7 @@ import { buildDiagnostics, readRom, type Diagnostics } from "./diag";
 import { GUIDES } from "./guide";
 
 const common = commonJson as unknown as Pack;
-const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
+const brandPacks = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson, meizuJson] as unknown as Pack[];
 /** 连上手机后换成「通用 + 这个品牌」合并后的规则包。 */
 let pack: Pack = common;
 let brand: Pack | undefined;
@@ -107,7 +108,7 @@ function lastBackup(): Backup | undefined {
 
 async function getShell(onAuth: () => void): Promise<Shell | undefined> {
   if (demo) {
-    if (["oppo", "vivo", "honor", "huawei", "samsung"].includes(demoBrand)) {
+    if (["oppo", "vivo", "honor", "huawei", "samsung", "meizu"].includes(demoBrand)) {
       const { state, ui } = brandPhone(demoBrand as Parameters<typeof brandPhone>[0]);
       return new FakePhone(state, 30, ui);
     }
@@ -240,7 +241,7 @@ function review(pf: PreflightResult) {
       ${brand ? `<h2>${esc(brand.title)}</h2>
       ${brand.credits ? `<p class="muted">${esc(brand.credits)}</p>` : ""}
       <div class="card">${orderedRules(pack).filter((r) => r.group).map((r) => ruleRow(r, pf)).join("")}</div>`
-        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO、OPPO / 一加 / realme、vivo / iQOO、荣耀，华为和三星（未经真机验证）。</div>`}
+        : `<div class="note info">「${esc(d.brand)}」的专属去广告规则还在做，这次先做通用设置。目前已支持：小米 / 红米 / POCO、OPPO / 一加 / realme、vivo / iQOO、荣耀，华为、三星和魅族（未经真机验证）。</div>`}
       <h2>收尾</h2>
       <div class="card">${orderedRules(pack).filter((r) => r.runLast).map((r) => ruleRow(r, pf)).join("")}</div>
       <div class="note info">下一步会先读取手机当前的设置，生成备份文件下载到电脑。<b>请保存好这个文件</b>，以后还原要用。</div>

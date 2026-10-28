@@ -6,6 +6,7 @@ import honorJson from "../rules/honor.json";
 import xiaomiJson from "../rules/xiaomi.json";
 import huaweiJson from "../rules/huawei.json";
 import samsungJson from "../rules/samsung.json";
+import meizuJson from "../rules/meizu.json";
 import type { Pack } from "../src/types";
 import { FakePhone, demoState } from "../src/fake-phone";
 import { fakeXiaomiApps } from "../src/fake-ui";
@@ -14,7 +15,7 @@ import { brandPhone } from "../src/fake-brands";
 import { type ExecDiag, brandPackFor, execute, inspect, mergePacks, preflight, prepare, restoreBackup, validateBackup, type Log } from "../src/engine";
 
 const common = commonJson as unknown as Pack;
-const packs = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson] as unknown as Pack[];
+const packs = [xiaomiJson, oppoJson, vivoJson, honorJson, huaweiJson, samsungJson, meizuJson] as unknown as Pack[];
 const quiet: Log = () => {};
 
 async function run(brand: Parameters<typeof brandPhone>[0], only?: (id: string) => boolean) {
@@ -51,10 +52,11 @@ describe("品牌识别", () => {
   it("华为、三星有包，其他品牌只用通用设置", () => {
     expect(brandPackFor(dev("HUAWEI"), packs)?.pack).toBe("huawei");
     expect(brandPackFor(dev("samsung"), packs)?.pack).toBe("samsung");
+    expect(brandPackFor(dev("Meizu"), packs)?.pack).toBe("meizu");
     expect(brandPackFor(dev("motorola"), packs)).toBeUndefined();
   });
   it("没验证过的华为、三星规则默认不勾", () => {
-    for (const p of packs.filter((p) => p.pack === "huawei" || p.pack === "samsung")) for (const r of p.rules) expect(r.tier).toBe("optional");
+    for (const p of packs.filter((p) => ["huawei", "samsung", "meizu"].includes(p.pack))) for (const r of p.rules) expect(r.tier).toBe("optional");
   });
 });
 
@@ -265,6 +267,18 @@ describe("三星（模拟界面按公开教程搭，只测代码路径）", () =
   });
 });
 
+describe("魅族（模拟界面按公开教程搭，只测代码路径）", () => {
+  it("关精选内容推送和开屏广告，保留预警和自动更新", async () => {
+    const { st, result, logs } = await run("meizu");
+    expect(Object.values(result).every((r) => r === "ok"), logs.join("\n")).toBe(true);
+    expectStates(
+      st,
+      ["gs·资讯头条", "gs·天气插件显示热词", "gs·精选内容推送", "weatherSet·本地资讯", "weatherSet·精选内容推送", "weatherSet·允许展示开屏推荐", "mstoreSet·精选内容推送", "browserSet·精选内容推送", "customizecenterSet·精选内容推送", "safeCards·安全播报", "safeCards·应用推荐下载", "videoSet·精选内容推送", "videoSet·展示开屏广告", "videoSet·本地播放器推荐在线内容"],
+      ["gs·最近使用", "weatherSet·天气预警", "mstoreSet·自动更新应用", "browserSet·保存密码", "safeSet·自动清理", "safeCards·流量提醒"],
+    );
+  });
+});
+
 describe("诊断文件", () => {
   it("没找到入口时记下当时的屏幕和应用版本", async () => {
     const { state, ui } = brandPhone("huawei");
@@ -294,6 +308,7 @@ describe("只检查，不改设置", () => {
     honor: () => brandPhone("honor"),
     huawei: () => brandPhone("huawei"),
     samsung: () => brandPhone("samsung"),
+    meizu: () => brandPhone("meizu"),
   };
   it.each(Object.keys(phones))("%s：找到要改的开关，但一个都不动", async (name) => {
     const { state, ui } = phones[name as keyof typeof phones]();
